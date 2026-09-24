@@ -1,13 +1,18 @@
-# ArcheryNote — v0.3
+# ArcheryNote — v0.3.2
 
 Notatnik łuczniczy ze zdjęcia tarczy. Maszyna rejestruje geometrię, człowiek wskazuje trafienia.
+
+## Nowe w v0.3.1
+
+- **Nowa tarcza z formularzem:** pierwsze zdjęcie z nieznanym zestawem markerów otwiera okno z nazwą, licem i rozstawem; profil powstaje dopiero po zapisaniu.
+- **Arkusze markerów:** 66 mm — 4 na jednej A4; 100 mm — 2 na A4 (2 kartki); 100 mm — 4 na jednej A3; 150 mm — 1 na A4. Wymiary w PDF sprawdzone: 100,0 i 66,0 mm, OpenCV czyta wszystkie ID.
 
 ## Nowe w v0.3 — klub
 
 - **Profile łuczników** (imię, typ łuku, średnica trzonka, strzał w serii, dystans). Wybór na górze ekranu; każdy ma własną sesję, historię i porównania na karcie.
 - **Kilku łuczników na jednym zdjęciu:** zamknij serię jednego, przełącz łucznika i wskaż jego strzały na tym samym zdjęciu. Strzały już wskazane przez innych są widoczne na szaro z inicjałami.
 - **Tarcze rozpoznawane po markerach:** tarcza k ma ID 4k…4k+3 (do 12 tarcz). Każda ma własną nazwę, lico, rozstaw i profil kalibracji; pierwsze zdjęcie nowej tarczy tworzy ją automatycznie.
-- **Arkusz markerów do druku** (66 mm po 4 na A4, 100 lub 150 mm po 1 na A4) z linijką 50 mm do sprawdzenia skali. Wydruk zweryfikowany detektorem OpenCV.
+- **Arkusz markerów do druku** z linijką 50 mm do sprawdzenia skali.
 - Eksport v3 przenosi łuczników, tarcze i sesje; import starszych plików przypisuje sesje do bieżącego łucznika. Dane z v0.2 migrują się same (profil → „Tarcza 1”, ustawienia → „Łucznik 1”).
 
 ## Nowe w v0.2
@@ -67,4 +72,4 @@ tests/regression.js   test na folderze zdjęć (Node + jpeg-js)
 - wykres trendów między sesjami (jest tabela porównawcza),
 - 3-spot.
 
-ARENARIA & Claude (Anthropic)
+AR & Claude (Anthropic)

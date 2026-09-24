@@ -1,6 +1,6 @@
 /* ArcheryNote core — marker detection, homography, face calibration, scoring.
    Zero dependencies. Works in browser (window.ANCore) and Node (module.exports).
-   ARENARIA & Claude (Anthropic) */
+   AR & Claude (Anthropic) */
 (function (root) {
 'use strict';
 

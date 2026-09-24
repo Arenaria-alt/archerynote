@@ -1,7 +1,7 @@
 /* ArcheryNote stats — session metrics and the summary card (SVG).
    Zero dependencies. Browser: window.ANStats; Node: module.exports.
    Coordinates: x right, y UP, millimetres from face centre.
-   ARENARIA & Claude (Anthropic) */
+   AR & Claude (Anthropic) */
 (function (root) {
 'use strict';
 
@@ -185,7 +185,7 @@ function cardSVG(session, history) {
     ['10 / X', `${S.tens} / ${S.xs}`, `pudła: ${S.misses}`],
     ['Grupa 90%', S.d90 != null ? nf(S.d90) : '—', S.d90 != null ? (delta(S.d90, pD, 0, ' mm', true) || 'mm') : ''],
     ['Rozrzut σ', S.sx != null ? `${nf(S.sx)}/${nf(S.sy)}` : '—', S.sx != null ? 'poziomo/pionowo, mm' : ''],
-    ['Czas', S.minutes != null ? nf(S.minutes) + ' min' : '—', S.minutes && S.endsCount > 1 ? `${nf(S.minutes / (S.endsCount - 1), 1)} min/seria` : '']
+    ['Czas', S.minutes >= 1 ? nf(S.minutes) + ' min' : '—', S.minutes >= 1 && S.endsCount > 1 ? `${nf(S.minutes / (S.endsCount - 1), 1)} min/seria` : '']
   ];
   const gap = 8, tw = (IW - 2 * gap) / 3, th = 78;
   tiles.forEach(([k, v, sub], i) => {
@@ -246,7 +246,7 @@ function cardSVG(session, history) {
   });
   if (!prev.length) b += txt(M + 12, ty + 30, 'Porównanie pojawi się od następnej zamkniętej sesji', { size: 12.5, fill: T.mut }) + txt(M + 12, ty + 47, 'z tym samym licem i dystansem.', { size: 12.5, fill: T.mut });
   y += tH + 22;
-  b += txt(M, y, 'ArcheryNote · ARENARIA & Claude (Anthropic)', { size: 11.5, fill: '#56616b' });
+  b += txt(M, y, 'ArcheryNote · AR & Claude (Anthropic)', { size: 11.5, fill: '#56616b' });
   const H = y + 16;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" font-family="${FONT}"><rect width="${W}" height="${H}" fill="${T.bg}"/>${b}</svg>`;
 }

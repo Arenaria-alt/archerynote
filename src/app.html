@@ -52,6 +52,8 @@ details summary{cursor:pointer;color:var(--mut);font-size:13px}
 #cardBox{max-width:520px;margin:0 auto}
 #cardBox .bar{cursor:pointer}
 #histTbl tr:hover td{background:#262e36}
+.modal{position:fixed;inset:0;z-index:30;background:#000b;display:flex;align-items:center;justify-content:center;padding:16px}
+.mbox{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;max-width:480px;width:100%}
 footer{text-align:center;color:#56616b;font-size:11px;padding:20px}
 </style>
 </head>
@@ -65,7 +67,7 @@ footer{text-align:center;color:#56616b;font-size:11px;padding:20px}
 <div class="card" id="cardArcher">
   <div class="row">
     <label class="f" style="flex:2 1 160px">Łucznik<select id="archerSel"></select></label>
-    <div class="f" style="flex:1 1 120px;justify-content:flex-end"><span class="hint">Tarcza</span><span id="stationInfo" style="font-weight:600">—</span></div>
+    <div style="flex:1 1 120px;display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--mut)">Tarcza<span id="stationInfo" style="font-weight:600;color:var(--fg);font-size:15px;padding:8px 0">—</span></div>
   </div>
   <div class="hint" id="othersInfo" style="margin-top:6px;display:none"></div>
 </div>
@@ -172,11 +174,31 @@ footer{text-align:center;color:#56616b;font-size:11px;padding:20px}
     <h2 style="margin-top:16px">Arkusz markerów do druku</h2>
     <div class="row">
       <label class="f">Dla tarczy nr<select id="mkSet"></select></label>
-      <label class="f">Rozmiar markera<select id="mkSize"><option value="66">66 mm (4 na A4)</option><option value="100" selected>100 mm (1 na A4)</option><option value="150">150 mm (1 na A4)</option></select></label>
+      <label class="f">Rozmiar markera<select id="mkSize"><option value="66/4/A4">66 mm — 4 na jednej A4</option><option value="100/2/A4" selected>100 mm — 2 na A4 (2 kartki)</option><option value="100/4/A3">100 mm — 4 na jednej A3</option><option value="150/1/A4">150 mm — 1 na A4 (4 kartki)</option></select></label>
     </div>
     <div class="row" style="margin-top:8px"><button id="btnSheet">Otwórz arkusz</button></div>
     <div class="hint" style="margin-top:6px">Każda tarcza ma własne ID markerów (tarcza 1: 0–3, tarcza 2: 4–7 …), dzięki czemu apka sama rozpoznaje, przy której stoisz. Drukuj w skali 100% i sprawdź linijkę 50 mm. Większy marker czyta się pod ostrzejszym kątem i lepiej znosi przestrzeliny.</div>
   </details>
+</div>
+
+<div id="newSt" class="modal" style="display:none">
+  <div class="mbox">
+    <h2 id="nsTitle">Nowa tarcza</h2>
+    <div class="hint" id="nsInfo"></div>
+    <div class="row" style="margin-top:10px">
+      <label class="f">Nazwa<input id="nsName" type="text" maxlength="30"></label>
+      <label class="f">Lico<select id="nsFace"></select></label>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <label class="f">Rozstaw markerów szer. [mm]<input id="nsW" type="number" inputmode="decimal"></label>
+      <label class="f">Rozstaw markerów wys. [mm]<input id="nsH" type="number" inputmode="decimal"></label>
+    </div>
+    <div class="hint" style="margin-top:6px">Zmierz taśmą odległość między środkami markerów — wystarczy ±5 cm. Dokładną skalę ustali kalibracja z pierścieni; rozstaw służy tylko do rozpoznania, że lico ma właściwy rozmiar.</div>
+    <div class="row" style="margin-top:12px">
+      <button id="nsCancel" class="ghost">Anuluj</button>
+      <button id="nsOk" class="pri" style="margin-left:auto">Zapisz i kalibruj</button>
+    </div>
+  </div>
 </div>
 
 <div id="overlay">
@@ -188,7 +210,7 @@ footer{text-align:center;color:#56616b;font-size:11px;padding:20px}
   <div id="cardBox"></div>
   <div class="hint" style="padding:8px 4px 30px">Dotknij słupka albo punktu serii, żeby podświetlić jej strzały na tarczy.</div>
 </div>
-<footer>ArcheryNote v0.3 · ARENARIA &amp; Claude (Anthropic)</footer>
+<footer>ArcheryNote v0.3.2 · AR &amp; Claude (Anthropic)</footer>
 </main>
 
 <script>
@@ -226,17 +248,16 @@ if (!S.archers || !S.archers.length) {
   const old = store.get('settings', {});
   S.archers = [{ id: 'a' + Date.now(), name: 'Łucznik 1', bow: 'klasyczny', od: old.od && old.od !== 5.5 ? old.od : 5.45, n: old.n || 6, dist: old.dist || 18 }];
   S.archerId = S.archers[0].id;
-  if (!S.stations) S.stations = { 0: { k: 0, name: 'Tarcza 1', face: old.face || 'wa80', W: old.W || 606, H: old.H || 718, profile: store.get('profile', null) } };
+  if (!S.stations && (old.face || store.get('profile', null))) S.stations = { 0: { k: 0, name: 'Tarcza 1', face: old.face || 'wa80', W: old.W || 606, H: old.H || 718, profile: store.get('profile', null) } };
 }
 if (!S.stations) S.stations = {};
 if (!S.archers.some(a => a.id === S.archerId)) S.archerId = S.archers[0].id;
 const archer = () => S.archers.find(a => a.id === S.archerId);
 function station(k = S.stationK) {
-  if (!S.stations[k]) {
-    const last = Object.values(S.stations).sort((p, q) => (q.used || 0) - (p.used || 0))[0];
-    S.stations[k] = { k, name: 'Tarcza ' + (k + 1), face: last ? last.face : 'wa80', W: last ? last.W : 606, H: last ? last.H : 718, profile: null };
-  }
-  return S.stations[k];
+  if (S.stations[k]) return S.stations[k];
+  // not registered yet (dialog creates it): transient defaults, never stored
+  const last = Object.values(S.stations).sort((p, q) => (q.used || 0) - (p.used || 0))[0];
+  return S._tmpSt && S._tmpSt.k === k ? S._tmpSt : (S._tmpSt = { k, name: 'Tarcza ' + (k + 1), face: last ? last.face : 'wa80', W: last ? last.W : 606, H: last ? last.H : 718, profile: null, tmp: true });
 }
 S.settings = {};
 for (const key of ['od', 'n', 'dist']) Object.defineProperty(S.settings, key, { get: () => archer()[key], set: v => { archer()[key] = v; } });
@@ -334,30 +355,56 @@ $('btnCalib').onclick = () => { if (S.reg && !S.reg.manual) { calibrateHere(); r
 
 // ---------- printable marker sheet ----------
 function markerSVG(id, mm) {
-  const bits = C.CODES[id], cell = mm / 6, q = cell; // quiet zone = 1 cell
+  const bits = C.CODES[id], cell = mm / 6, q = Math.min(cell, 8); // white quiet zone (cut margin)
   let r = `<rect x="0" y="0" width="${mm + 2 * q}" height="${mm + 2 * q}" fill="#fff"/><rect x="${q}" y="${q}" width="${mm}" height="${mm}" fill="#000"/>`;
   for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) if (bits[y * 4 + x]) r += `<rect x="${q + (x + 1) * cell}" y="${q + (y + 1) * cell}" width="${cell + 0.02}" height="${cell + 0.02}" fill="#fff"/>`;
   const w = mm + 2 * q;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}mm" height="${w}mm" viewBox="0 0 ${w} ${w}" shape-rendering="crispEdges">${r}</svg>`;
 }
 $('btnSheet').onclick = () => {
-  const k = +$('mkSet').value, mm = +$('mkSize').value, ids = [0, 1, 2, 3].map(i => 4 * k + i);
+  const k = +$('mkSet').value, [mm, per, paper] = $('mkSize').value.split('/'), size = +mm, n = +per, ids = [0, 1, 2, 3].map(i => 4 * k + i);
   const name = (S.stations[k] && S.stations[k].name) || `Tarcza ${k + 1}`;
   const ruler = `<svg xmlns="http://www.w3.org/2000/svg" width="52mm" height="8mm" viewBox="0 0 52 8"><path d="M1 1v6M51 1v6M1 4h50" stroke="#000" stroke-width="0.4" fill="none"/>${[...Array(11)].map((_, i) => `<path d="M${1 + i * 5} ${i % 2 ? 3 : 2}v${i % 2 ? 2 : 4}" stroke="#000" stroke-width="0.3"/>`).join('')}</svg>`;
-  const cap = id => `<div class="cap">ArcheryNote · ${esc(name)} · marker ID ${id}</div>`;
-  let pages = '';
-  if (mm <= 66) pages = `<section><div class="grid">${ids.map(id => `<div>${markerSVG(id, mm)}${cap(id)}</div>`).join('')}</div><div class="foot">${ruler}<span>linijka 50 mm — sprawdź skalę wydruku</span></div></section>`;
-  else pages = ids.map(id => `<section><div class="one">${markerSVG(id, mm)}${cap(id)}</div><div class="foot">${ruler}<span>linijka 50 mm — sprawdź skalę wydruku</span></div></section>`).join('');
+  const cell = id => `<div class="m">${markerSVG(id, size)}<div class="cap">${esc(name)} · ID ${id}</div></div>`;
+  const pageH = paper === 'A3' ? 400 : 277, cols = n === 4 ? 2 : 1;
+  const info = `<div class="info"><b>${esc(name)}</b> — markery ID ${ids[0]}–${ids[3]}. Wytnij z białym marginesem i przypnij po jednym w każdym rogu lica (kolejność dowolna). Zmierz rozstaw środków markerów w poziomie i w pionie. Drukuj w skali 100%, bez dopasowania do strony${paper === 'A3' ? ', na papierze A3' : ''}.</div>`;
+  const pages = []; for (let i = 0; i < 4; i += n) pages.push(ids.slice(i, i + n));
+  const body = pages.map((pg, i) => `<section>${i === 0 ? info : ''}<div class="grid" style="grid-template-columns:repeat(${cols},auto)">${pg.map(cell).join('')}</div><div class="foot">${ruler}<span>linijka 50 mm — sprawdź skalę wydruku · strona ${i + 1}/${pages.length}</span></div></section>`).join('');
   const html = `<!DOCTYPE html><html lang="pl"><head><meta charset="utf-8"><title>Markery — ${esc(name)}</title><style>
-@page{size:A4;margin:10mm}body{margin:0;font:11pt system-ui,sans-serif;color:#000;background:#fff}
-section{height:277mm;page-break-after:always;display:flex;flex-direction:column;justify-content:space-between}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:10mm;justify-items:center;padding-top:10mm}.one{text-align:center;padding-top:20mm}
-.cap{font-size:9pt;margin-top:2mm;text-align:center}.foot{display:flex;align-items:center;gap:4mm;font-size:9pt}
-.info{padding:6mm;border:0.3mm solid #000;margin-bottom:6mm;font-size:10pt}@media screen{body{padding:10mm;background:#eee}section{background:#fff;margin-bottom:10mm;padding:10mm;height:auto;min-height:250mm}}
-</style></head><body><div class="info"><b>${esc(name)}</b> — markery ID ${ids[0]}–${ids[3]}. Przypnij po jednym w każdym rogu lica (kolejność dowolna — apka rozpoznaje rogi po położeniu). Zmierz rozstaw środków markerów w poziomie i w pionie i wpisz w ustawieniach tarczy. Drukuj w skali 100%, bez dopasowania do strony.</div>${pages}</body></html>`;
+@page{size:${paper};margin:10mm}body{margin:0;font:11pt system-ui,sans-serif;color:#000;background:#fff}
+section{height:${pageH}mm;page-break-after:always;display:flex;flex-direction:column;justify-content:space-between;box-sizing:border-box}
+section:last-child{page-break-after:auto}
+.grid{display:grid;justify-content:space-evenly;align-content:space-evenly;flex:1;gap:4mm}.m{text-align:center}
+.cap{font-size:8pt;margin-top:1mm}.foot{display:flex;align-items:center;gap:4mm;font-size:9pt}
+.info{padding:2.5mm 3mm;border:0.3mm solid #000;font-size:8.5pt}
+@media screen{body{padding:10mm;background:#ddd}section{background:#fff;margin:0 auto 10mm;padding:10mm;width:${paper === 'A3' ? 277 : 190}mm;box-sizing:content-box}}
+</style></head><body>${body}</body></html>`;
   const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
   const w = window.open(url, '_blank');
   if (!w) { const a = document.createElement('a'); a.href = url; a.download = `markery_tarcza${k + 1}.html`; document.body.appendChild(a); a.click(); a.remove(); }
+};
+
+// ---------- new station dialog ----------
+for (const f of C.FACES) { const o = document.createElement('option'); o.value = f.id; o.textContent = f.name; $('nsFace').appendChild(o); }
+let nsK = null;
+function openNewStation(k) {
+  nsK = k;
+  const last = Object.values(S.stations).sort((p, q) => (q.used || 0) - (p.used || 0))[0];
+  $('nsTitle').textContent = `Nowa tarcza — markery ${4 * k}–${4 * k + 3}`;
+  $('nsInfo').textContent = 'Pierwsze zdjęcie tej tarczy. Po zapisaniu apka zrobi z niego profil — najlepiej, gdy w licu nie ma jeszcze strzał.';
+  $('nsName').value = 'Tarcza ' + (k + 1); $('nsFace').value = last ? last.face : 'wa80';
+  $('nsW').value = last ? last.W : 606; $('nsH').value = last ? last.H : 718;
+  $('newSt').style.display = 'flex';
+}
+$('nsCancel').onclick = () => { $('newSt').style.display = 'none'; setMsg('Tarcza nie została dodana. Zrób zdjęcie jeszcze raz, żeby ją dodać.', 'amber'); };
+$('nsOk').onclick = () => {
+  const num = id => parseFloat(String($(id).value).replace(',', '.'));
+  const W = num('nsW'), H = num('nsH'), name = $('nsName').value.trim() || 'Tarcza ' + (nsK + 1);
+  if (!(W > 100 && H > 100)) { alert('Podaj rozstaw markerów w milimetrach.'); return; }
+  S.stations[nsK] = { k: nsK, name, face: $('nsFace').value, W, H, profile: null, used: Date.now() };
+  S.stationK = nsK; saveAll(); renderStations();
+  $('newSt').style.display = 'none'; busy(true);
+  setTimeout(() => { reprocess(); busy(false); renderEnd(); }, 30);
 };
 
 // ---------- photo loading ----------
@@ -391,7 +438,8 @@ function reprocess() {
   const g = C.toGray(S.rgba, S.w, S.h);
   const markers = C.detectMarkers(g, S.w, S.h);
   const a = C.assignCorners(markers);
-  if (a.set != null) { S.stationK = a.set; station().used = Date.now(); saveAll(); renderStations(); }
+  if (a.set != null && !S.stations[a.set] && a.ok) { S.reg = null; setChip('amber', 'nowa tarcza'); setMsg(`Nieznana tarcza (markery ${4 * a.set}–${4 * a.set + 3}) — uzupełnij jej dane.`, 'amber'); draw(); openNewStation(a.set); return; }
+  if (a.set != null && S.stations[a.set]) { S.stationK = a.set; station().used = Date.now(); saveAll(); renderStations(); }
   S.reg = null; $('btnCalib').disabled = true;
   if (!a.ok) { setChip('red', 'brak rejestracji'); setMsg(a.msg + ' Możesz też użyć rejestracji ręcznej.', 'red'); S.reg = { markers: a.markers, state: 'red', failed: true }; draw(); return; }
   const R = rect(), H = C.homography([[0, 0], [R[0], 0], R, [0, R[1]]], a.pts);
