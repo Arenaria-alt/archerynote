@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14181c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>ArcheryNote</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{--bg:#14181c;--panel:#1d2329;--line:#2c343c;--fg:#e8ecef;--mut:#93a0ab;--acc:#f2c230;--ok:#3ecf6e;--warn:#f0a531;--bad:#ef5350;--r:10px}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+header{display:flex;align-items:center;gap:10px;padding:10px 14px;padding-top:max(10px,env(safe-area-inset-top));border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:5}
+header h1{font-size:17px;margin:0;font-weight:650;letter-spacing:.2px}
+header h1 b{color:var(--acc)}
+.chip{margin-left:auto;font-size:12px;padding:4px 9px;border-radius:99px;background:var(--line);color:var(--mut);white-space:nowrap}
+.chip.green{background:#1d3b28;color:var(--ok)}.chip.amber{background:#3d3019;color:var(--warn)}.chip.red{background:#3d1f1f;color:var(--bad)}
+main{max-width:900px;margin:0 auto;padding:10px 12px 90px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px;margin:10px 0}
+.card h2{font-size:13px;text-transform:uppercase;letter-spacing:.8px;color:var(--mut);margin:0 0 8px;font-weight:600}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+label.f{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--mut);flex:1 1 130px}
+input,select{background:#0f1316;color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;min-width:0}
+button{font:inherit;border:1px solid var(--line);background:#262e36;color:var(--fg);border-radius:8px;padding:9px 13px;cursor:pointer;touch-action:manipulation}
+button.pri{background:var(--acc);color:#1a1a1a;border-color:var(--acc);font-weight:650}
+button.ghost{background:transparent}
+button:disabled{opacity:.45}
+.msg{font-size:13px;color:var(--mut);margin-top:6px}
+.msg.green{color:var(--ok)}.msg.amber{color:var(--warn)}.msg.red{color:var(--bad)}
+#viewWrap{position:relative;background:#0b0d0f;border-radius:var(--r);overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;display:none}
+#view{display:block;width:100%;height:62vh}
+#busy{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:#0009;font-size:14px}
+.tools{position:absolute;right:8px;bottom:8px;display:flex;gap:6px}
+.tools button{padding:6px 10px;background:#000a}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+td,th{padding:6px 5px;border-bottom:1px solid var(--line);text-align:left;font-size:14px}
+th{color:var(--mut);font-weight:500;font-size:12px}
+td.sc{font-weight:700;font-size:16px}
+.big{font-size:26px;font-weight:700}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
+.stat{background:#0f1316;border-radius:8px;padding:8px}
+.stat small{display:block;color:var(--mut);font-size:11px}
+.stat span{font-size:18px;font-weight:650}
+details summary{cursor:pointer;color:var(--mut);font-size:13px}
+.hint{font-size:12px;color:var(--mut)}
+.sc10{color:var(--acc)}.scM{color:var(--bad)}
+footer{text-align:center;color:#56616b;font-size:11px;padding:20px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Archery<b>Note</b></h1>
+  <span id="chip" class="chip">brak zdjęcia</span>
+</header>
+<main>
+
+<div class="card" id="cardShot">
+  <div class="row">
+    <button class="pri" id="btnPhoto">Zdjęcie serii</button>
+    <button id="btnPhotoFile" class="ghost">z pliku</button>
+    <input type="file" id="fileCam" accept="image/*" capture="environment" hidden>
+    <input type="file" id="fileAny" accept="image/*" hidden>
+    <span class="hint" id="endInfo"></span>
+  </div>
+  <div class="msg" id="regMsg">Najpierw zdjęcie tarczy z czterema markerami. Pierwsze zdjęcie sesji najlepiej bez strzał — z niego powstaje profil stanowiska.</div>
+</div>
+
+<div id="viewWrap">
+  <canvas id="view"></canvas>
+  <div id="busy">Liczę…</div>
+  <div class="tools">
+    <button id="btnFit" title="Dopasuj widok">Cały kadr</button>
+    <button id="btnRings" title="Pokaż/ukryj pierścienie">Pierścienie</button>
+  </div>
+</div>
+
+<div class="card" id="cardEnd" style="display:none">
+  <h2>Seria <span id="endNo">1</span></h2>
+  <div class="hint">Tapnij punkt wejścia strzały. Przeciągnij punkt, żeby go poprawić — pojawi się lupa. Liczy się środek trzonka; reguła linii działa sama.</div>
+  <table id="arrowTbl"><thead><tr><th>#</th><th>Wynik</th><th>r [mm]</th><th>x / y [mm]</th><th></th></tr></thead><tbody></tbody></table>
+  <div class="row" style="margin-top:8px">
+    <button id="btnMiss">Pudło</button>
+    <button id="btnUndo" class="ghost">Cofnij</button>
+    <span style="margin-left:auto" class="big" id="endSum">0</span>
+  </div>
+  <div class="row" style="margin-top:8px">
+    <button class="pri" id="btnCloseEnd" style="flex:1">Zamknij serię</button>
+    <button id="btnManual" class="ghost">Rejestracja ręczna</button>
+  </div>
+</div>
+
+<div class="card" id="cardSession">
+  <h2>Sesja</h2>
+  <div class="stats" id="sessStats"></div>
+  <table id="endsTbl" style="margin-top:8px"><thead><tr><th>Seria</th><th>Strzały</th><th>Suma</th><th>Środek grupy</th><th>σ [mm]</th></tr></thead><tbody></tbody></table>
+  <div class="row" style="margin-top:10px">
+    <button id="btnExport">Eksport JSON</button>
+    <button id="btnImport" class="ghost">Import</button>
+    <input type="file" id="fileImport" accept="application/json,.json" hidden>
+    <button id="btnNewSess" class="ghost" style="margin-left:auto">Nowa sesja</button>
+  </div>
+</div>
+
+<div class="card">
+  <details id="setDet">
+    <summary>Ustawienia i profil stanowiska</summary>
+    <div class="row" style="margin-top:10px">
+      <label class="f">Lico<select id="setFace"></select></label>
+      <label class="f">Strzał w serii<select id="setN"><option>3</option><option selected>6</option><option>9</option><option>12</option></select></label>
+      <label class="f">Dystans [m]<input id="setDist" type="number" inputmode="decimal" value="18"></label>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <label class="f">Średnica zewn. trzonka [mm]<input id="setOD" type="number" step="0.1" inputmode="decimal" value="5.5"></label>
+      <label class="f">Rozstaw markerów szer. [mm]<input id="setW" type="number" inputmode="decimal" value="606"></label>
+      <label class="f">Rozstaw markerów wys. [mm]<input id="setH" type="number" inputmode="decimal" value="718"></label>
+    </div>
+    <div class="hint" style="margin-top:6px">Średnica trzonka — zmierzona suwmiarką, nie z oznaczenia (ID 4,2 ma OD ok. 5,2–5,8 mm). Rozstaw markerów to środki markerów; wartość przybliżona wystarczy, bo skalę koryguje kalibracja z pierścieni.</div>
+    <div class="card" style="background:#0f1316;margin-top:10px">
+      <div id="profInfo" class="msg">Brak profilu stanowiska.</div>
+      <div class="row" style="margin-top:8px">
+        <button id="btnCalib" disabled>Kalibruj z bieżącego zdjęcia</button>
+        <button id="btnClearProf" class="ghost">Usuń profil</button>
+      </div>
+    </div>
+  </details>
+</div>
+
+<footer>ArcheryNote v0.1 · ARENARIA &amp; Claude (Anthropic)</footer>
+</main>
+
+<script>
+/*CORE*/
+</script>
+<script>
+(() => {
+'use strict';
+const C = window.ANCore, $ = id => document.getElementById(id);
+const WORK = 2000;               // working long side in px
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('an.' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('an.' + k, JSON.stringify(v)); } catch (e) {} }
+};
+
+// ---------- state ----------
+const S = {
+  img: null, w: 0, h: 0, rgba: null,  // working image
+  reg: null,       // {H, Hinv, markers, lut, state, manual}
+  profile: store.get('profile', null),
+  settings: Object.assign({ face: 'wa80', n: 6, dist: 18, od: 5.5, W: 606, H: 718 }, store.get('settings', {})),
+  arrows: [],      // current end: {px:[x,y]|null, f:[x,y]|null, state:'hit'|'miss'}
+  session: store.get('session', null),
+  showRings: true, photoTime: null,
+  view: { s: 1, tx: 0, ty: 0 }, drag: null, loupe: null, manualPts: null
+};
+if (!S.session) S.session = newSession();
+function newSession() { return { id: 's' + Date.now(), date: new Date().toISOString(), ends: [] }; }
+const face = () => C.FACES.find(f => f.id === S.settings.face) || C.FACES[1];
+const rect = () => [S.settings.W, S.settings.H];
+function saveAll() { store.set('settings', S.settings); store.set('session', S.session); store.set('profile', S.profile); }
+
+// ---------- settings UI ----------
+for (const f of C.FACES) { const o = document.createElement('option'); o.value = f.id; o.textContent = f.name; $('setFace').appendChild(o); }
+$('setFace').value = S.settings.face; $('setN').value = S.settings.n; $('setDist').value = S.settings.dist;
+$('setOD').value = S.settings.od; $('setW').value = S.settings.W; $('setH').value = S.settings.H;
+for (const [id, key, num] of [['setFace', 'face'], ['setN', 'n', 1], ['setDist', 'dist', 1], ['setOD', 'od', 1], ['setW', 'W', 1], ['setH', 'H', 1]]) {
+  $(id).addEventListener('change', e => {
+    const v = num ? parseFloat(e.target.value) : e.target.value; if (num && !(v > 0)) return;
+    const old = S.settings[key]; S.settings[key] = v;
+    if ((key === 'W' || key === 'H' || key === 'face') && S.profile && old !== v) { S.profile = null; setMsg('Zmiana rozstawu lub lica unieważnia profil — skalibruj ponownie.', 'amber'); }
+    rescoreAll(); saveAll(); refreshProfile(); if (S.img) reprocess(); renderEnd(); renderSession();
+  });
+}
+function refreshProfile() {
+  const p = S.profile;
+  $('profInfo').textContent = p
+    ? `Profil: ${new Date(p.date).toLocaleString('pl-PL')} · środek lica ${p.c[0].toFixed(1)} / ${p.c[1].toFixed(1)} mm w układzie markerów · korekta skali ${((p.s - 1) * 100).toFixed(2)}% · owalność ${p.ovality.toFixed(3)}`
+    : 'Brak profilu stanowiska. Powstanie automatycznie z pierwszego zdjęcia albo przyciskiem poniżej.';
+  $('profInfo').className = 'msg' + (p ? ' green' : '');
+}
+$('btnClearProf').onclick = () => { S.profile = null; saveAll(); refreshProfile(); if (S.img) reprocess(); };
+$('btnCalib').onclick = () => { if (S.reg && !S.reg.manual) { calibrateHere(); draw(); } };
+
+// ---------- photo loading ----------
+$('btnPhoto').onclick = () => $('fileCam').click();
+$('btnPhotoFile').onclick = () => $('fileAny').click();
+for (const id of ['fileCam', 'fileAny']) $(id).addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) loadPhoto(f); });
+
+function loadPhoto(file) {
+  if (S.arrows.length && !confirmSwap()) return;
+  S.photoTime = file.lastModified || Date.now();
+  const url = URL.createObjectURL(file), im = new Image();
+  im.onload = () => {
+    const k = Math.min(1, WORK / Math.max(im.naturalWidth, im.naturalHeight));
+    const cv = document.createElement('canvas'); cv.width = Math.round(im.naturalWidth * k); cv.height = Math.round(im.naturalHeight * k);
+    const cx = cv.getContext('2d', { willReadFrequently: true }); cx.drawImage(im, 0, 0, cv.width, cv.height);
+    URL.revokeObjectURL(url);
+    S.img = cv; S.w = cv.width; S.h = cv.height; S.rgba = cx.getImageData(0, 0, S.w, S.h).data;
+    S.arrows = []; S.manualPts = null;
+    $('viewWrap').style.display = 'block'; $('cardEnd').style.display = 'block';
+    sizeCanvas(); fitView(); busy(true);
+    setTimeout(() => { reprocess(); busy(false); renderEnd(); }, 30);
+  };
+  im.onerror = () => setMsg('Nie da się odczytać zdjęcia.', 'red');
+  im.src = url;
+}
+function confirmSwap() { return window.confirm('Bieżąca seria ma zapisane strzały. Zastąpić zdjęcie? (strzały zostaną usunięte)'); }
+function busy(b) { $('busy').style.display = b ? 'flex' : 'none'; }
+
+function reprocess() {
+  const t0 = performance.now();
+  const g = C.toGray(S.rgba, S.w, S.h);
+  const markers = C.detectMarkers(g, S.w, S.h);
+  const a = C.assignCorners(markers);
+  S.reg = null; $('btnCalib').disabled = true;
+  if (!a.ok) { setChip('red', 'brak rejestracji'); setMsg(a.msg + ' Możesz też użyć rejestracji ręcznej.', 'red'); S.reg = { markers: a.markers, state: 'red', failed: true }; draw(); return; }
+  const R = rect(), H = C.homography([[0, 0], [R[0], 0], R, [0, R[1]]], a.pts);
+  const lut = C.makeLUT(C.colorRef(S.rgba, S.w, S.h, a.markers));
+  S.reg = { H, Hinv: C.inv(H), markers: a.markers, lut, state: 'amber' };
+  $('btnCalib').disabled = false;
+  if (!S.profile) {
+    calibrateHere(true);
+  } else {
+    const v = C.verifyProfile(S.rgba, S.w, S.h, H, R, face().D, lut, S.profile);
+    S.reg.state = v.state; S.reg.verify = v;
+    setChip(v.state, v.state === 'green' ? 'siatka OK' : v.state === 'amber' ? 'sprawdź siatkę' : 'siatka nie siada');
+    setMsg(v.msg + ` (${Math.round(performance.now() - t0)} ms)`, v.state);
+  }
+  rescoreCurrent(); draw();
+}
+function calibrateHere(auto) {
+  const P = C.calibrateFace(S.rgba, S.w, S.h, S.reg.H, rect(), face().D, S.reg.lut);
+  if (!P.ok) { S.reg.state = 'red'; setChip('red', 'brak profilu'); setMsg(P.msg, 'red'); return false; }
+  S.profile = { c: P.c, A: P.A, s: P.s, bias: P.bias, ovality: P.ovality, rect: rect(), face: S.settings.face, date: new Date().toISOString() };
+  S.reg.state = 'green'; saveAll(); refreshProfile(); rescoreCurrent();
+  setChip('green', 'profil zapisany');
+  setMsg(`${auto ? 'Brak profilu — utworzony z tego zdjęcia. ' : 'Profil zapisany. '}Korekta skali ${((P.s - 1) * 100).toFixed(2)}%, owalność ${P.ovality.toFixed(3)}. Sprawdź, czy pierścienie leżą na nadruku.`, 'green');
+  return true;
+}
+function setChip(cls, t) { const c = $('chip'); c.className = 'chip ' + cls; c.textContent = t; }
+function setMsg(t, cls) { const m = $('regMsg'); m.textContent = t; m.className = 'msg ' + (cls || ''); }
+
+// ---------- geometry: px <-> face mm ----------
+function pxToFace(p) {
+  if (!S.reg) return null;
+  if (S.reg.manual) return S.reg.manual.toFace(p);
+  if (!S.profile || !S.reg.Hinv) return null;
+  return C.mmToFace(S.profile, C.apply(S.reg.Hinv, p));
+}
+function faceToPx(f) {
+  if (!S.reg) return null;
+  if (S.reg.manual) return S.reg.manual.toPx(f);
+  if (!S.profile || !S.reg.H) return null;
+  return C.apply(S.reg.H, C.faceToMm(S.profile, f));
+}
+function scoreOf(f) { const r = Math.hypot(f[0], f[1]), fc = face(); return Object.assign({ r }, C.score(r, fc.D, S.settings.od, fc.min)); }
+function rescoreCurrent() { for (const a of S.arrows) if (a.px) { a.f = pxToFace(a.px); } }
+function rescoreAll() { for (const e of S.session.ends) for (const a of e.arrows) if (a.x != null) { const s = scoreOf([a.x, a.y]); a.score = s.score; a.label = s.label; } }
+
+// ---------- manual registration (fallback) ----------
+// tap: centre, then 3 points on the outer edge of the black zone (boundary black/white)
+$('btnManual').onclick = () => {
+  if (!S.img) return;
+  S.manualPts = []; S.arrows = []; renderEnd();
+  setChip('amber', 'rejestracja ręczna');
+  setMsg('Rejestracja ręczna: tapnij środek lica, potem 3 punkty na zewnętrznej krawędzi czarnego pola (granica czarne/białe), rozłożone wokół tarczy.', 'amber');
+  draw();
+};
+function manualFromPts(P) {
+  const c = P[0], d = P.slice(1).map(p => [p[0] - c[0], p[1] - c[1]]);
+  // solve (a,b,c) for a x^2 + 2b xy + c y^2 = 1 through 3 points
+  const M = d.map(v => [v[0] * v[0], 2 * v[0] * v[1], v[1] * v[1]]);
+  const det3 = m => m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+  const D0 = det3(M); if (Math.abs(D0) < 1e-12) return null;
+  const sol = [0, 1, 2].map(k => det3(M.map((r, i) => r.map((v, j) => j === k ? 1 : v))) / D0);
+  const [a, b, cc] = sol; if (a <= 0 || a * cc - b * b <= 0) return null;
+  const R = 8 * face().D / 20;
+  const dd = Math.sqrt(a * cc - b * b), t = Math.sqrt(a + cc + 2 * dd), Sq = [(a + dd) / t, b / t, (cc + dd) / t].map(v => v * R);
+  const det = Sq[0] * Sq[2] - Sq[1] * Sq[1];
+  return {
+    toFace: p => { const v = [p[0] - c[0], p[1] - c[1]]; return [Sq[0] * v[0] + Sq[1] * v[1], Sq[1] * v[0] + Sq[2] * v[1]]; },
+    toPx: f => [c[0] + (Sq[2] * f[0] - Sq[1] * f[1]) / det, c[1] + (-Sq[1] * f[0] + Sq[0] * f[1]) / det]
+  };
+}
+
+// ---------- canvas view ----------
+const cv = $('view'), ctx = cv.getContext('2d');
+let dpr = 1;
+function sizeCanvas() { dpr = window.devicePixelRatio || 1; const r = cv.getBoundingClientRect(); cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr); }
+function fitView() { const s = Math.min(cv.width / S.w, cv.height / S.h); S.view = { s, tx: (cv.width - S.w * s) / 2, ty: (cv.height - S.h * s) / 2 }; draw(); }
+window.addEventListener('resize', () => { if (!S.img) return; sizeCanvas(); fitView(); });
+$('btnFit').onclick = fitView;
+$('btnRings').onclick = () => { S.showRings = !S.showRings; draw(); };
+const toScreen = p => [p[0] * S.view.s + S.view.tx, p[1] * S.view.s + S.view.ty];
+const toImg = q => [(q[0] - S.view.tx) / S.view.s, (q[1] - S.view.ty) / S.view.s];
+
+function ringPath(r, xf) {
+  ctx.beginPath();
+  for (let i = 0; i <= 120; i++) { const th = i / 120 * 2 * Math.PI, p = faceToPx([r * Math.cos(th), r * Math.sin(th)]); if (!p) return false; const q = xf(p); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); }
+  return true;
+}
+function drawScene(xf, scale) {
+  // rings
+  const st = S.reg && S.reg.state, col = st === 'green' ? '#3ecf6e' : st === 'red' ? '#ef5350' : '#f0a531';
+  if (S.showRings && S.reg && (S.reg.manual || (S.profile && S.reg.H))) {
+    const fc = face(), radii = [];
+    for (let n = fc.min; n <= 10; n++) radii.push((11 - n) * fc.D / 20);
+    radii.push(fc.D / 40);
+    for (const r of radii) { if (!ringPath(r, xf)) break; ctx.strokeStyle = '#000b'; ctx.lineWidth = 3 * dpr; ctx.stroke(); ctx.strokeStyle = col; ctx.lineWidth = 1.2 * dpr; ctx.stroke(); }
+    const c = faceToPx([0, 0]); if (c) { const q = xf(c); ctx.strokeStyle = col; ctx.lineWidth = 1 * dpr; ctx.beginPath(); ctx.moveTo(q[0] - 8 * dpr, q[1]); ctx.lineTo(q[0] + 8 * dpr, q[1]); ctx.moveTo(q[0], q[1] - 8 * dpr); ctx.lineTo(q[0], q[1] + 8 * dpr); ctx.stroke(); }
+  }
+  // markers
+  if (S.reg && S.reg.markers) for (const m of S.reg.markers) {
+    ctx.beginPath(); m.corners.forEach((p, i) => { const q = xf(p); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); }); ctx.closePath();
+    ctx.strokeStyle = '#4fc3f7'; ctx.lineWidth = 2 * dpr; ctx.stroke();
+  }
+  // manual points
+  if (S.manualPts) for (const [i, p] of S.manualPts.entries()) { const q = xf(p); ctx.fillStyle = i ? '#4fc3f7' : '#f2c230'; ctx.beginPath(); ctx.arc(q[0], q[1], 5 * dpr, 0, 7); ctx.fill(); }
+  // arrows
+  const pxPerMm = S.reg && S.reg.H && S.profile ? mmScaleAt() : null;
+  S.arrows.forEach((a, i) => {
+    if (!a.px) return; const q = xf(a.px);
+    const rr = Math.max(4 * dpr, pxPerMm ? S.settings.od / 2 * pxPerMm * scale : 0);
+    ctx.lineWidth = 2 * dpr; ctx.strokeStyle = '#000'; ctx.fillStyle = '#ff2d95cc';
+    ctx.beginPath(); ctx.arc(q[0], q[1], rr, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.font = `700 ${13 * dpr}px system-ui`; ctx.fillStyle = '#fff'; ctx.strokeStyle = '#000'; ctx.lineWidth = 3 * dpr;
+    const lbl = (i + 1) + (a.f ? '·' + scoreOf(a.f).label : '');
+    ctx.strokeText(lbl, q[0] + rr + 3 * dpr, q[1] - rr); ctx.fillText(lbl, q[0] + rr + 3 * dpr, q[1] - rr);
+  });
+}
+function mmScaleAt() { // approx px per mm near face centre
+  const a = faceToPx([0, 0]), b = faceToPx([50, 0]); return a && b ? Math.hypot(b[0] - a[0], b[1] - a[1]) / 50 : null;
+}
+function draw() {
+  if (!S.img) return;
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#0b0d0f'; ctx.fillRect(0, 0, cv.width, cv.height);
+  const v = S.view; ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(S.img, v.tx, v.ty, S.w * v.s, S.h * v.s);
+  drawScene(toScreen, v.s);
+  if (S.loupe) drawLoupe(S.loupe);
+}
+function drawLoupe(p) {
+  const R = 70 * dpr, Z = Math.max(3, S.view.s * 3.5) , q = toScreen(p);
+  let cx = q[0], cy = q[1] - 110 * dpr; if (cy - R < 0) cy = q[1] + 110 * dpr;
+  cx = Math.min(Math.max(cx, R + 4), cv.width - R - 4);
+  ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7); ctx.clip();
+  ctx.fillStyle = '#000'; ctx.fillRect(cx - R, cy - R, 2 * R, 2 * R);
+  const xf = pt => [(pt[0] - p[0]) * Z + cx, (pt[1] - p[1]) * Z + cy];
+  ctx.drawImage(S.img, cx - p[0] * Z, cy - p[1] * Z, S.w * Z, S.h * Z);
+  drawScene(xf, Z);
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 1 * dpr; ctx.beginPath(); ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy); ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R); ctx.stroke();
+  ctx.restore(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2 * dpr; ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7); ctx.stroke();
+  const a = S.drag && S.drag.arrow; if (a && a.f) { const s = scoreOf(a.f); ctx.font = `700 ${14 * dpr}px system-ui`; ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.fillText(`${s.label} · r ${s.r.toFixed(1)} mm`, cx, cy + R + 16 * dpr); ctx.textAlign = 'start'; }
+}
+
+// ---------- pointer interaction ----------
+const ptrs = new Map();
+cv.addEventListener('pointerdown', e => {
+  cv.setPointerCapture(e.pointerId);
+  const q = [e.offsetX * dpr, e.offsetY * dpr]; ptrs.set(e.pointerId, q);
+  if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; S.drag = { pinch: true, d0: Math.hypot(a[0] - b[0], a[1] - b[1]), m0: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], v0: { ...S.view } }; S.loupe = null; draw(); return; }
+  const p = toImg(q);
+  // hit test arrows
+  let hit = null, best = 18 * dpr;
+  for (const a of S.arrows) if (a.px) { const s = toScreen(a.px), d = Math.hypot(s[0] - q[0], s[1] - q[1]); if (d < best) { best = d; hit = a; } }
+  if (hit) S.drag = { arrow: hit, off: [hit.px[0] - p[0], hit.px[1] - p[1]], q0: q, moved: false };
+  else S.drag = { pan: true, q0: q, v0: { ...S.view }, moved: false };
+});
+cv.addEventListener('pointermove', e => {
+  if (!ptrs.has(e.pointerId)) return;
+  const q = [e.offsetX * dpr, e.offsetY * dpr]; ptrs.set(e.pointerId, q);
+  const D = S.drag; if (!D) return;
+  if (D.pinch && ptrs.size === 2) {
+    const [a, b] = [...ptrs.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]), m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    const k = d / D.d0, s = Math.min(Math.max(D.v0.s * k, 0.05), 12);
+    const ip = [(D.m0[0] - D.v0.tx) / D.v0.s, (D.m0[1] - D.v0.ty) / D.v0.s];
+    S.view = { s, tx: m[0] - ip[0] * s, ty: m[1] - ip[1] * s }; draw();
+  } else if (D.arrow) {
+    if (!D.moved && Math.hypot(q[0] - D.q0[0], q[1] - D.q0[1]) < 6 * dpr) return;
+    D.moved = true; const p = toImg(q); D.arrow.px = [p[0] + D.off[0], p[1] + D.off[1]]; D.arrow.f = pxToFace(D.arrow.px); S.loupe = D.arrow.px; draw();
+  } else if (D.pan) {
+    const dx = q[0] - D.q0[0], dy = q[1] - D.q0[1];
+    if (Math.hypot(dx, dy) > 8 * dpr) D.moved = true;
+    if (D.moved) { S.view = { ...D.v0, tx: D.v0.tx + dx, ty: D.v0.ty + dy }; draw(); }
+  }
+});
+function endPtr(e) {
+  if (!ptrs.has(e.pointerId)) return;
+  const q = ptrs.get(e.pointerId); ptrs.delete(e.pointerId);
+  const D = S.drag;
+  if (D && D.pinch) { if (ptrs.size === 0) S.drag = null; return; }
+  S.drag = null; S.loupe = null;
+  if (D && D.arrow) { if (!D.moved && e.type === 'pointerup') tap(toImg(q)); renderEnd(); draw(); return; }
+  if (D && D.pan && !D.moved && e.type === 'pointerup') tap(toImg(q));
+  draw();
+}
+cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
+cv.addEventListener('wheel', e => {
+  e.preventDefault(); const q = [e.offsetX * dpr, e.offsetY * dpr], ip = toImg(q);
+  const s = Math.min(Math.max(S.view.s * Math.exp(-e.deltaY * 0.0015), 0.05), 12);
+  S.view = { s, tx: q[0] - ip[0] * s, ty: q[1] - ip[1] * s }; draw();
+}, { passive: false });
+
+function tap(p) {
+  if (S.manualPts) {
+    S.manualPts.push(p);
+    if (S.manualPts.length === 4) {
+      const m = manualFromPts(S.manualPts);
+      if (!m) { setMsg('Punkty nie tworzą elipsy — spróbuj jeszcze raz, rozłóż je szerzej.', 'red'); S.manualPts = []; }
+      else { S.reg = Object.assign(S.reg || {}, { manual: m, state: 'amber', markers: [] }); S.manualPts = null; setChip('amber', 'ręczna'); setMsg('Rejestracja ręczna gotowa (przybliżenie afiniczne). Sprawdź pierścienie i tapnij strzały.', 'amber'); rescoreCurrent(); }
+    }
+    draw(); return;
+  }
+  if (!S.reg || S.reg.failed && !S.reg.manual) { setMsg('Brak rejestracji — nie można policzyć punktów. Użyj rejestracji ręcznej.', 'red'); return; }
+  if (!S.reg.manual && !S.profile) { setMsg('Brak profilu stanowiska — skalibruj.', 'red'); return; }
+  S.arrows.push({ px: p, f: pxToFace(p), state: 'hit' });
+  renderEnd(); draw();
+}
+$('btnMiss').onclick = () => { S.arrows.push({ px: null, f: null, state: 'miss' }); renderEnd(); draw(); };
+$('btnUndo').onclick = () => { S.arrows.pop(); renderEnd(); draw(); };
+
+// ---------- end table ----------
+function arrowScore(a) { return a.state === 'miss' || !a.f ? { score: 0, label: 'M', r: null } : scoreOf(a.f); }
+const fx0 = v => { const t = v.toFixed(0); return t === '-0' ? '0' : t; };
+function renderEnd() {
+  const tb = $('arrowTbl').tBodies[0]; tb.innerHTML = ''; let sum = 0;
+  S.arrows.forEach((a, i) => {
+    const s = arrowScore(a); sum += s.score;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${i + 1}</td><td class="sc ${s.score === 10 ? 'sc10' : s.score === 0 ? 'scM' : ''}">${s.label}</td><td>${s.r != null ? s.r.toFixed(1) : '—'}</td><td>${a.f ? fx0(a.f[0]) + ' / ' + fx0(-a.f[1]) : '—'}</td><td><button class="ghost" data-i="${i}" style="padding:3px 8px">✕</button></td>`;
+    tb.appendChild(tr);
+  });
+  tb.querySelectorAll('button').forEach(b => b.onclick = () => { S.arrows.splice(+b.dataset.i, 1); renderEnd(); draw(); });
+  $('endSum').textContent = sum; $('endNo').textContent = S.session.ends.length + 1;
+  $('endInfo').textContent = `${S.arrows.length} / ${S.settings.n} strzał`;
+}
+$('btnCloseEnd').onclick = () => {
+  if (!S.arrows.length) return;
+  if (S.arrows.length !== S.settings.n && !window.confirm(`Seria ma ${S.arrows.length} strzał zamiast ${S.settings.n}. Zapisać mimo to?`)) return;
+  const e = {
+    nr: S.session.ends.length + 1, time: S.photoTime || Date.now(),
+    face: S.settings.face, dist: S.settings.dist, od: S.settings.od, n: S.settings.n,
+    reg: S.reg ? (S.reg.manual ? 'manual' : S.reg.state) : 'none', dev: S.reg && S.reg.verify ? S.reg.verify.dev : null,
+    arrows: S.arrows.map((a, i) => { const s = arrowScore(a); return { nr: i + 1, x: a.f ? +a.f[0].toFixed(1) : null, y: a.f ? +(-a.f[1]).toFixed(1) : null, score: s.score, label: s.label, state: a.state === 'miss' ? 'pudlo' : 'trafiona' }; })
+  };
+  S.session.ends.push(e); saveAll();
+  S.arrows = []; S.img = null; S.reg = null; $('viewWrap').style.display = 'none'; $('cardEnd').style.display = 'none';
+  setChip('', 'seria zapisana'); setMsg(`Seria ${e.nr} zapisana: ${e.arrows.reduce((s, a) => s + a.score, 0)} pkt. Kolejne zdjęcie po następnej serii.`, 'green');
+  renderEnd(); renderSession(); window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+// ---------- session ----------
+function groupStats(arrs) {
+  const P = arrs.filter(a => a.x != null); if (P.length < 2) return null;
+  const mx = P.reduce((s, a) => s + a.x, 0) / P.length, my = P.reduce((s, a) => s + a.y, 0) / P.length;
+  const sd = Math.sqrt(P.reduce((s, a) => s + (a.x - mx) ** 2 + (a.y - my) ** 2, 0) / (P.length - 1));
+  return { mx, my, sd };
+}
+function renderSession() {
+  const E = S.session.ends, tb = $('endsTbl').tBodies[0]; tb.innerHTML = '';
+  let tot = 0, n = 0, x = 0, t10 = 0, m = 0; const all = [];
+  for (const e of E) {
+    const sum = e.arrows.reduce((s, a) => s + a.score, 0); tot += sum; n += e.arrows.length;
+    for (const a of e.arrows) { if (a.label === 'X') x++; if (a.score === 10) t10++; if (a.score === 0) m++; all.push(a); }
+    const g = groupStats(e.arrows);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${e.nr}</td><td>${e.arrows.map(a => a.label).join(' ')}</td><td class="sc">${sum}</td><td>${g ? fmtXY(g.mx, g.my) : '—'}</td><td>${g ? g.sd.toFixed(0) : '—'}</td>`;
+    tb.appendChild(tr);
+  }
+  const g = groupStats(all);
+  const dur = E.length > 1 ? (E[E.length - 1].time - E[0].time) / 60000 : null;
+  $('sessStats').innerHTML = [
+    ['Suma', tot], ['Średnia/strzałę', n ? (tot / n).toFixed(2) : '—'], ['Strzał', n], ['10 / X', `${t10} / ${x}`], ['Pudła', m],
+    ['Środek grupy', g ? fmtXY(g.mx, g.my) : '—'], ['Skupienie σ', g ? g.sd.toFixed(0) + ' mm' : '—'], ['Czas', dur != null ? dur.toFixed(0) + ' min' : '—']
+  ].map(([k, v]) => `<div class="stat"><small>${k}</small><span>${v}</span></div>`).join('');
+}
+function fmtXY(x, y) { return `${Math.abs(x).toFixed(0)} ${x >= 0 ? 'P' : 'L'} / ${Math.abs(y).toFixed(0)} ${y >= 0 ? 'G' : 'D'}`; }
+$('btnNewSess').onclick = () => { if (S.session.ends.length && !window.confirm('Zacząć nową sesję? Bieżąca zniknie z telefonu — wyeksportuj ją najpierw, jeśli chcesz ją zachować.')) return; S.session = newSession(); saveAll(); renderSession(); renderEnd(); };
+$('btnExport').onclick = () => {
+  const data = { app: 'ArcheryNote', version: 1, exported: new Date().toISOString(), settings: S.settings, profile: S.profile, session: S.session };
+  const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' }), a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = `archerynote_${S.session.date.slice(0, 10)}.json`; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+};
+$('btnImport').onclick = () => $('fileImport').click();
+$('fileImport').addEventListener('change', e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  f.text().then(t => {
+    const d = JSON.parse(t); if (d.app !== 'ArcheryNote' || !d.session) throw new Error('format');
+    if (S.session.ends.length && !window.confirm('Zastąpić bieżącą sesję importowaną?')) return;
+    S.session = d.session; if (d.profile && window.confirm('Plik zawiera profil stanowiska. Wczytać go też?')) S.profile = d.profile;
+    saveAll(); refreshProfile(); renderSession(); renderEnd();
+  }).catch(() => alert('To nie jest plik ArcheryNote.'));
+});
+
+refreshProfile(); renderSession(); renderEnd();
+window.__AN = S; // debug hook
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+})();
+</script>
+</body>
+</html>
