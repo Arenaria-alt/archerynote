@@ -1,4 +1,4 @@
-# ArcheryNote — v0.3.2
+# ArcheryNote — v0.3.3
 
 Notatnik łuczniczy ze zdjęcia tarczy. Maszyna rejestruje geometrię, człowiek wskazuje trafienia.
 

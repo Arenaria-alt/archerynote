@@ -153,7 +153,8 @@ footer{text-align:center;color:#56616b;font-size:11px;padding:20px}
   <details id="setStation">
     <summary>Tarcze i markery</summary>
     <table id="stTbl" style="margin-top:8px"><thead><tr><th>Tarcza</th><th>Markery</th><th>Lico</th><th>Profil</th></tr></thead><tbody></tbody></table>
-    <div class="hint" id="stEmpty">Tarcza dopisuje się sama przy pierwszym zdjęciu z jej markerami.</div>
+    <div class="hint" id="stEmpty">Brak tarcz. Dodaj tarczę przyciskiem poniżej albo zrób zdjęcie tarczy z markerami — apka zapyta o jej dane.</div>
+    <div class="row" style="margin-top:8px"><button id="btnAddSt">Nowa tarcza</button><button id="btnDelSt" class="ghost" style="margin-left:auto">Usuń tarczę</button></div>
     <div id="stEdit" style="display:none;margin-top:10px">
       <h2 id="stTitle">Tarcza</h2>
       <div class="row">
@@ -185,6 +186,7 @@ footer{text-align:center;color:#56616b;font-size:11px;padding:20px}
   <div class="mbox">
     <h2 id="nsTitle">Nowa tarcza</h2>
     <div class="hint" id="nsInfo"></div>
+    <label class="f" id="nsNumWrap" style="margin-top:10px;display:none">Numer tarczy (zestaw markerów)<select id="nsNum"></select></label>
     <div class="row" style="margin-top:10px">
       <label class="f">Nazwa<input id="nsName" type="text" maxlength="30"></label>
       <label class="f">Lico<select id="nsFace"></select></label>
@@ -210,7 +212,7 @@ footer{text-align:center;color:#56616b;font-size:11px;padding:20px}
   <div id="cardBox"></div>
   <div class="hint" style="padding:8px 4px 30px">Dotknij słupka albo punktu serii, żeby podświetlić jej strzały na tarczy.</div>
 </div>
-<footer>ArcheryNote v0.3.2 · AR &amp; Claude (Anthropic)</footer>
+<footer>ArcheryNote v0.3.3 · AR &amp; Claude (Anthropic)</footer>
 </main>
 
 <script>
@@ -1152,7 +1154,7 @@ function renderStations() {
     tb.appendChild(tr);
   }
   const st = S.stations[S.stationK];
-  $('stEdit').style.display = st ? 'block' : 'none';
+  $('stEdit').style.display = st ? 'block' : 'none'; $('btnDelSt').disabled = !st;
   $('stationInfo').textContent = st ? `${st.name} · ${(C.FACES.find(f => f.id === st.face) || {}).name || ''}`.replace('WA ', '') : '—';
   $('mkSet').value = S.stationK;
   if (!st) return;
@@ -1213,24 +1215,52 @@ section:last-child{page-break-after:auto}
 // ---------- new station dialog ----------
 for (const f of C.FACES) { const o = document.createElement('option'); o.value = f.id; o.textContent = f.name; $('nsFace').appendChild(o); }
 let nsK = null;
-function openNewStation(k) {
-  nsK = k;
+let nsManual = false;
+function openNewStation(k, manual) {
+  nsK = k; nsManual = !!manual;
   const last = Object.values(S.stations).sort((p, q) => (q.used || 0) - (p.used || 0))[0];
-  $('nsTitle').textContent = `Nowa tarcza — markery ${4 * k}–${4 * k + 3}`;
-  $('nsInfo').textContent = 'Pierwsze zdjęcie tej tarczy. Po zapisaniu apka zrobi z niego profil — najlepiej, gdy w licu nie ma jeszcze strzał.';
+  $('nsNumWrap').style.display = manual ? 'flex' : 'none';
+  if (manual) {
+    $('nsNum').innerHTML = '';
+    for (let i = 0; i < C.NSETS; i++) if (!S.stations[i]) { const o = document.createElement('option'); o.value = i; o.textContent = `${i + 1}  (markery ${4 * i}–${4 * i + 3})`; $('nsNum').appendChild(o); }
+    $('nsNum').value = k;
+  }
+  const upd = () => {
+    const kk = nsManual ? +$('nsNum').value : nsK;
+    $('nsTitle').textContent = `Nowa tarcza — markery ${4 * kk}–${4 * kk + 3}`;
+    if (nsManual && (!$('nsName').value || /^Tarcza \d+$/.test($('nsName').value))) $('nsName').value = 'Tarcza ' + (kk + 1);
+  };
+  $('nsNum').onchange = upd;
+  $('nsInfo').textContent = manual
+    ? 'Po zapisaniu wydrukuj markery tej tarczy (przycisk „Otwórz arkusz” niżej) i przypnij je w rogach lica. Profil powstanie z pierwszego zdjęcia — najlepiej bez strzał w licu.'
+    : 'Pierwsze zdjęcie tej tarczy. Po zapisaniu apka zrobi z niego profil — najlepiej, gdy w licu nie ma jeszcze strzał.';
+  $('nsOk').textContent = manual ? 'Zapisz' : 'Zapisz i kalibruj';
   $('nsName').value = 'Tarcza ' + (k + 1); $('nsFace').value = last ? last.face : 'wa80';
   $('nsW').value = last ? last.W : 606; $('nsH').value = last ? last.H : 718;
-  $('newSt').style.display = 'flex';
+  upd(); $('newSt').style.display = 'flex';
 }
-$('nsCancel').onclick = () => { $('newSt').style.display = 'none'; setMsg('Tarcza nie została dodana. Zrób zdjęcie jeszcze raz, żeby ją dodać.', 'amber'); };
+$('nsCancel').onclick = () => { $('newSt').style.display = 'none'; if (!nsManual) setMsg('Tarcza nie została dodana. Zrób zdjęcie jeszcze raz, żeby ją dodać.', 'amber'); };
 $('nsOk').onclick = () => {
   const num = id => parseFloat(String($(id).value).replace(',', '.'));
+  if (nsManual) nsK = +$('nsNum').value;
   const W = num('nsW'), H = num('nsH'), name = $('nsName').value.trim() || 'Tarcza ' + (nsK + 1);
   if (!(W > 100 && H > 100)) { alert('Podaj rozstaw markerów w milimetrach.'); return; }
   S.stations[nsK] = { k: nsK, name, face: $('nsFace').value, W, H, profile: null, used: Date.now() };
   S.stationK = nsK; saveAll(); renderStations();
-  $('newSt').style.display = 'none'; busy(true);
-  setTimeout(() => { reprocess(); busy(false); renderEnd(); }, 30);
+  $('newSt').style.display = 'none';
+  if (nsManual) { $('mkSet').value = nsK; $('setStation').open = true; setMsg(`${name} dodana. Wydrukuj jej markery (${4 * nsK}–${4 * nsK + 3}) i zrób pierwsze zdjęcie.`, 'green'); return; }
+  busy(true); setTimeout(() => { reprocess(); busy(false); renderEnd(); }, 30);
+};
+$('btnAddSt').onclick = () => {
+  let k = 0; while (k < C.NSETS && S.stations[k]) k++;
+  if (k >= C.NSETS) { alert(`Wykorzystano wszystkie ${C.NSETS} zestawy markerów.`); return; }
+  openNewStation(k, true);
+};
+$('btnDelSt').onclick = () => {
+  const st = S.stations[S.stationK]; if (!st) return;
+  if (!window.confirm(`Usunąć „${st.name}” (markery ${4 * st.k}–${4 * st.k + 3}) razem z jej profilem? Sesje w historii zostają.`)) return;
+  delete S.stations[st.k]; const rest = Object.keys(S.stations).map(Number);
+  S.stationK = rest.length ? rest[0] : 0; saveAll(); renderStations(); if (S.img) reprocess();
 };
 
 // ---------- photo loading ----------
