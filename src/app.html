@@ -47,6 +47,11 @@ td.sc{font-weight:700;font-size:16px}
 details summary{cursor:pointer;color:var(--mut);font-size:13px}
 .hint{font-size:12px;color:var(--mut)}
 .sc10{color:var(--acc)}.scM{color:var(--bad)}
+#overlay{position:fixed;inset:0;z-index:20;background:var(--bg);overflow:auto;display:none;padding:0 10px;padding-top:env(safe-area-inset-top)}
+.ovbar{position:sticky;top:0;display:flex;gap:8px;padding:10px 0;background:var(--bg);z-index:2}
+#cardBox{max-width:520px;margin:0 auto}
+#cardBox .bar{cursor:pointer}
+#histTbl tr:hover td{background:#262e36}
 footer{text-align:center;color:#56616b;font-size:11px;padding:20px}
 </style>
 </head>
@@ -56,6 +61,14 @@ footer{text-align:center;color:#56616b;font-size:11px;padding:20px}
   <span id="chip" class="chip">brak zdjęcia</span>
 </header>
 <main>
+
+<div class="card" id="cardArcher">
+  <div class="row">
+    <label class="f" style="flex:2 1 160px">Łucznik<select id="archerSel"></select></label>
+    <div class="f" style="flex:1 1 120px;justify-content:flex-end"><span class="hint">Tarcza</span><span id="stationInfo" style="font-weight:600">—</span></div>
+  </div>
+  <div class="hint" id="othersInfo" style="margin-top:6px;display:none"></div>
+</div>
 
 <div class="card" id="cardShot">
   <div class="row">
@@ -79,7 +92,8 @@ footer{text-align:center;color:#56616b;font-size:11px;padding:20px}
 
 <div class="card" id="cardEnd" style="display:none">
   <h2>Seria <span id="endNo">1</span></h2>
-  <div class="hint">Tapnij punkt wejścia strzały. Przeciągnij punkt, żeby go poprawić — pojawi się lupa. Liczy się środek trzonka; reguła linii działa sama.</div>
+  <div class="hint">Dotknij tarczy — pojawi się lupa z krzyżem. Przesuń palec na punkt wejścia strzały i puść. Żeby poprawić strzałę, stuknij jej wiersz w tabeli i wskaż ją jeszcze raz. Dwa palce: przesuwanie i powiększanie.</div>
+  <div class="msg amber" id="selHint" style="display:none"></div>
   <table id="arrowTbl"><thead><tr><th>#</th><th>Wynik</th><th>r [mm]</th><th>x / y [mm]</th><th></th></tr></thead><tbody></tbody></table>
   <div class="row" style="margin-top:8px">
     <button id="btnMiss">Pudło</button>
@@ -95,49 +109,98 @@ footer{text-align:center;color:#56616b;font-size:11px;padding:20px}
 <div class="card" id="cardSession">
   <h2>Sesja</h2>
   <div class="stats" id="sessStats"></div>
-  <table id="endsTbl" style="margin-top:8px"><thead><tr><th>Seria</th><th>Strzały</th><th>Suma</th><th>Środek grupy</th><th>σ [mm]</th></tr></thead><tbody></tbody></table>
+  <table id="endsTbl" style="margin-top:8px"><thead><tr><th>Seria</th><th>Strzały</th><th>Suma</th><th>Środek grupy</th><th>90% [mm]</th></tr></thead><tbody></tbody></table>
+  <div class="row" style="margin-top:10px">
+    <button id="btnSummary" disabled>Podsumowanie</button>
+    <button class="pri" id="btnEndSess" style="margin-left:auto" disabled>Zakończ sesję</button>
+  </div>
+</div>
+
+<div class="card" id="cardHist">
+  <div class="row" style="justify-content:space-between"><h2 style="margin:0">Historia</h2><label class="hint" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="histAll"> wszyscy łucznicy</label></div>
+  <table id="histTbl"><thead><tr><th>Data</th><th>Lico · dystans</th><th>Strzał</th><th>Śr.</th><th>90% [mm]</th></tr></thead><tbody></tbody></table>
+  <div class="hint" id="histEmpty">Zakończone sesje pojawią się tutaj. Dane są tylko w tym telefonie — eksport przenosi całą historię na drugi.</div>
   <div class="row" style="margin-top:10px">
     <button id="btnExport">Eksport JSON</button>
     <button id="btnImport" class="ghost">Import</button>
     <input type="file" id="fileImport" accept="application/json,.json" hidden>
-    <button id="btnNewSess" class="ghost" style="margin-left:auto">Nowa sesja</button>
   </div>
 </div>
 
 <div class="card">
-  <details id="setDet">
-    <summary>Ustawienia i profil stanowiska</summary>
+  <details id="setArcher">
+    <summary>Łucznik i sprzęt</summary>
     <div class="row" style="margin-top:10px">
-      <label class="f">Lico<select id="setFace"></select></label>
-      <label class="f">Strzał w serii<select id="setN"><option>3</option><option selected>6</option><option>9</option><option>12</option></select></label>
-      <label class="f">Dystans [m]<input id="setDist" type="number" inputmode="decimal" value="18"></label>
+      <label class="f">Imię / nazwa<input id="aName" type="text" maxlength="30"></label>
+      <label class="f">Łuk<select id="aBow"><option>klasyczny</option><option>bloczkowy</option><option>goły</option><option>tradycyjny</option><option>inny</option></select></label>
     </div>
     <div class="row" style="margin-top:8px">
-      <label class="f">Średnica zewn. trzonka [mm]<input id="setOD" type="number" step="0.1" inputmode="decimal" value="5.5"></label>
-      <label class="f">Rozstaw markerów szer. [mm]<input id="setW" type="number" inputmode="decimal" value="606"></label>
-      <label class="f">Rozstaw markerów wys. [mm]<input id="setH" type="number" inputmode="decimal" value="718"></label>
+      <label class="f">Średnica zewn. trzonka [mm]<input id="aOD" type="number" step="0.01" inputmode="decimal"></label>
+      <label class="f">Strzał w serii<select id="aN"><option>3</option><option>6</option><option>9</option><option>12</option></select></label>
+      <label class="f">Dystans [m]<input id="aDist" type="number" inputmode="decimal"></label>
     </div>
-    <div class="hint" style="margin-top:6px">Średnica trzonka — zmierzona suwmiarką, nie z oznaczenia (ID 4,2 ma OD ok. 5,2–5,8 mm). Rozstaw markerów to środki markerów; wartość przybliżona wystarczy, bo skalę koryguje kalibracja z pierścieni.</div>
-    <div class="card" style="background:#0f1316;margin-top:10px">
-      <div id="profInfo" class="msg">Brak profilu stanowiska.</div>
+    <div class="hint" style="margin-top:6px">Średnica trzonka — zmierzona suwmiarką, nie z oznaczenia (ID 4,2 ma OD ok. 5,2–5,8 mm). Zmiana przelicza bieżącą sesję.</div>
+    <div class="row" style="margin-top:10px">
+      <button id="btnAddArcher">Nowy łucznik</button>
+      <button id="btnDelArcher" class="ghost" style="margin-left:auto">Usuń łucznika</button>
+    </div>
+  </details>
+</div>
+
+<div class="card">
+  <details id="setStation">
+    <summary>Tarcze i markery</summary>
+    <table id="stTbl" style="margin-top:8px"><thead><tr><th>Tarcza</th><th>Markery</th><th>Lico</th><th>Profil</th></tr></thead><tbody></tbody></table>
+    <div class="hint" id="stEmpty">Tarcza dopisuje się sama przy pierwszym zdjęciu z jej markerami.</div>
+    <div id="stEdit" style="display:none;margin-top:10px">
+      <h2 id="stTitle">Tarcza</h2>
+      <div class="row">
+        <label class="f">Nazwa<input id="sName" type="text" maxlength="30"></label>
+        <label class="f">Lico<select id="sFace"></select></label>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <label class="f">Rozstaw markerów szer. [mm]<input id="sW" type="number" inputmode="decimal"></label>
+        <label class="f">Rozstaw markerów wys. [mm]<input id="sH" type="number" inputmode="decimal"></label>
+      </div>
+      <div class="hint" style="margin-top:6px">Rozstaw między środkami markerów, z dokładnością do kilku cm — skalę dokładnie ustala kalibracja z pierścieni. Zmiana lica lub rozstawu kasuje profil.</div>
+      <div id="profInfo" class="msg">Brak profilu.</div>
       <div class="row" style="margin-top:8px">
         <button id="btnCalib" disabled>Kalibruj z bieżącego zdjęcia</button>
         <button id="btnClearProf" class="ghost">Usuń profil</button>
       </div>
     </div>
+    <h2 style="margin-top:16px">Arkusz markerów do druku</h2>
+    <div class="row">
+      <label class="f">Dla tarczy nr<select id="mkSet"></select></label>
+      <label class="f">Rozmiar markera<select id="mkSize"><option value="66">66 mm (4 na A4)</option><option value="100" selected>100 mm (1 na A4)</option><option value="150">150 mm (1 na A4)</option></select></label>
+    </div>
+    <div class="row" style="margin-top:8px"><button id="btnSheet">Otwórz arkusz</button></div>
+    <div class="hint" style="margin-top:6px">Każda tarcza ma własne ID markerów (tarcza 1: 0–3, tarcza 2: 4–7 …), dzięki czemu apka sama rozpoznaje, przy której stoisz. Drukuj w skali 100% i sprawdź linijkę 50 mm. Większy marker czyta się pod ostrzejszym kątem i lepiej znosi przestrzeliny.</div>
   </details>
 </div>
 
-<footer>ArcheryNote v0.1 · ARENARIA &amp; Claude (Anthropic)</footer>
+<div id="overlay">
+  <div class="ovbar">
+    <button id="btnCardClose" class="ghost">Zamknij</button>
+    <button id="btnDelSess" class="ghost">Usuń</button>
+    <button id="btnCardPng" class="pri" style="margin-left:auto">Udostępnij PNG</button>
+  </div>
+  <div id="cardBox"></div>
+  <div class="hint" style="padding:8px 4px 30px">Dotknij słupka albo punktu serii, żeby podświetlić jej strzały na tarczy.</div>
+</div>
+<footer>ArcheryNote v0.3 · ARENARIA &amp; Claude (Anthropic)</footer>
 </main>
 
 <script>
 /*CORE*/
 </script>
 <script>
+/*STATS*/
+</script>
+<script>
 (() => {
 'use strict';
-const C = window.ANCore, $ = id => document.getElementById(id);
+const C = window.ANCore, ANStats = window.ANStats, $ = id => document.getElementById(id);
 const WORK = 2000;               // working long side in px
 const store = {
   get(k, d) { try { const v = localStorage.getItem('an.' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
@@ -145,43 +208,157 @@ const store = {
 };
 
 // ---------- state ----------
+// Archers (people + equipment) and stations (targets, recognised by marker set) live in localStorage;
+// sessions in IndexedDB. S.settings / S.profile are thin views onto the active archer and station.
 const S = {
   img: null, w: 0, h: 0, rgba: null,  // working image
-  reg: null,       // {H, Hinv, markers, lut, state, manual}
-  profile: store.get('profile', null),
-  settings: Object.assign({ face: 'wa80', n: 6, dist: 18, od: 5.5, W: 606, H: 718 }, store.get('settings', {})),
-  arrows: [],      // current end: {px:[x,y]|null, f:[x,y]|null, state:'hit'|'miss'}
-  session: store.get('session', null),
+  reg: null,       // {H, Hinv, markers, lut, state, manual, set}
+  archers: store.get('archers', null), archerId: store.get('archerId', null),
+  stations: store.get('stations', null), stationK: store.get('stationK', 0),
+  arrows: [],      // current end of the active archer: {px, f, state}
+  drafts: {},      // other archers' ends on the same photo: id -> {arrows, closed}
+  session: null,
   showRings: true, photoTime: null,
-  view: { s: 1, tx: 0, ty: 0 }, drag: null, loupe: null, manualPts: null
+  view: { s: 1, tx: 0, ty: 0 }, drag: null, sel: null, loupe: null, manualPts: null
 };
-if (!S.session) S.session = newSession();
-function newSession() { return { id: 's' + Date.now(), date: new Date().toISOString(), ends: [] }; }
+// migration from v0.1/v0.2 (flat settings + one profile)
+if (!S.archers || !S.archers.length) {
+  const old = store.get('settings', {});
+  S.archers = [{ id: 'a' + Date.now(), name: 'Łucznik 1', bow: 'klasyczny', od: old.od && old.od !== 5.5 ? old.od : 5.45, n: old.n || 6, dist: old.dist || 18 }];
+  S.archerId = S.archers[0].id;
+  if (!S.stations) S.stations = { 0: { k: 0, name: 'Tarcza 1', face: old.face || 'wa80', W: old.W || 606, H: old.H || 718, profile: store.get('profile', null) } };
+}
+if (!S.stations) S.stations = {};
+if (!S.archers.some(a => a.id === S.archerId)) S.archerId = S.archers[0].id;
+const archer = () => S.archers.find(a => a.id === S.archerId);
+function station(k = S.stationK) {
+  if (!S.stations[k]) {
+    const last = Object.values(S.stations).sort((p, q) => (q.used || 0) - (p.used || 0))[0];
+    S.stations[k] = { k, name: 'Tarcza ' + (k + 1), face: last ? last.face : 'wa80', W: last ? last.W : 606, H: last ? last.H : 718, profile: null };
+  }
+  return S.stations[k];
+}
+S.settings = {};
+for (const key of ['od', 'n', 'dist']) Object.defineProperty(S.settings, key, { get: () => archer()[key], set: v => { archer()[key] = v; } });
+for (const key of ['face', 'W', 'H']) Object.defineProperty(S.settings, key, { get: () => station()[key], set: v => { station()[key] = v; } });
+Object.defineProperty(S, 'profile', { get: () => station().profile, set: v => { station().profile = v; } });
 const face = () => C.FACES.find(f => f.id === S.settings.face) || C.FACES[1];
 const rect = () => [S.settings.W, S.settings.H];
-function saveAll() { store.set('settings', S.settings); store.set('session', S.session); store.set('profile', S.profile); }
+function saveAll() { store.set('archers', S.archers); store.set('archerId', S.archerId); store.set('stations', S.stations); store.set('stationK', S.stationK); }
+saveAll(); try { localStorage.removeItem('an.settings'); localStorage.removeItem('an.profile'); } catch (e) {}
 
-// ---------- settings UI ----------
-for (const f of C.FACES) { const o = document.createElement('option'); o.value = f.id; o.textContent = f.name; $('setFace').appendChild(o); }
-$('setFace').value = S.settings.face; $('setN').value = S.settings.n; $('setDist').value = S.settings.dist;
-$('setOD').value = S.settings.od; $('setW').value = S.settings.W; $('setH').value = S.settings.H;
-for (const [id, key, num] of [['setFace', 'face'], ['setN', 'n', 1], ['setDist', 'dist', 1], ['setOD', 'od', 1], ['setW', 'W', 1], ['setH', 'H', 1]]) {
+// ---------- archer UI ----------
+function renderArchers() {
+  const sel = $('archerSel'); sel.innerHTML = '';
+  for (const a of S.archers) { const o = document.createElement('option'); o.value = a.id; o.textContent = `${a.name} · ${a.bow}`; sel.appendChild(o); }
+  sel.value = S.archerId;
+  const a = archer(); $('aName').value = a.name; $('aBow').value = a.bow; $('aOD').value = a.od; $('aN').value = a.n; $('aDist').value = a.dist;
+  $('btnDelArcher').disabled = S.archers.length < 2;
+  const others = Object.entries(S.drafts).filter(([id, d]) => id !== S.archerId && d.arrows.length);
+  $('othersInfo').style.display = S.img && others.length ? 'block' : 'none';
+  $('othersInfo').textContent = 'Na tym zdjęciu: ' + others.map(([id, d]) => { const x = S.archers.find(a => a.id === id); return `${x ? x.name : '?'} (${d.arrows.length}${d.closed ? ', zapisane' : ''})`; }).join(', ') + '. Ich strzały widać na szaro.';
+}
+$('archerSel').addEventListener('change', e => switchArcher(e.target.value));
+function switchArcher(id) {
+  if (id === S.archerId) return;
+  if (!(S.drafts[S.archerId] && S.drafts[S.archerId].closed)) S.drafts[S.archerId] = { arrows: S.arrows, closed: false };
+  S.archerId = id; S.arrows = (S.drafts[id] && !S.drafts[id].closed) ? S.drafts[id].arrows : []; S.sel = null;
+  if (S.drafts[id] && S.drafts[id].closed) setMsg(`${archer().name} ma już zapisaną serię z tego zdjęcia.`, 'amber');
+  S.session = openSessionFor(id);
+  saveAll(); rescoreCurrent(); renderArchers(); renderSession(); renderEnd(); renderHistory(); draw();
+}
+for (const [id, key, num] of [['aName', 'name'], ['aBow', 'bow'], ['aOD', 'od', 1], ['aN', 'n', 1], ['aDist', 'dist', 1]]) {
   $(id).addEventListener('change', e => {
-    const v = num ? parseFloat(e.target.value) : e.target.value; if (num && !(v > 0)) return;
-    const old = S.settings[key]; S.settings[key] = v;
-    if ((key === 'W' || key === 'H' || key === 'face') && S.profile && old !== v) { S.profile = null; setMsg('Zmiana rozstawu lub lica unieważnia profil — skalibruj ponownie.', 'amber'); }
-    rescoreAll(); saveAll(); refreshProfile(); if (S.img) reprocess(); renderEnd(); renderSession();
+    const v = num ? parseFloat(String(e.target.value).replace(',', '.')) : e.target.value.trim(); if (num ? !(v > 0) : !v) { renderArchers(); return; }
+    archer()[key] = v; saveAll();
+    if (S.session) { S.session.archer = archerSnap(); if (key === 'dist' && !S.session.ends.length) S.session.dist = v; }
+    if (key === 'od') rescoreAll();
+    renderArchers(); renderEnd(); renderSession(); draw();
+  });
+}
+$('btnAddArcher').onclick = () => {
+  const name = (window.prompt('Imię lub nazwa łucznika:', '') || '').trim(); if (!name) return;
+  const a = archer(), n = { id: 'a' + Date.now(), name, bow: a.bow, od: a.od, n: a.n, dist: a.dist };
+  S.archers.push(n); saveAll(); renderArchers(); switchArcher(n.id); $('setArcher').open = true;
+};
+$('btnDelArcher').onclick = () => {
+  if (S.archers.length < 2) return;
+  const a = archer(), cnt = history.filter(h => h.archerId === a.id && h.ends && h.ends.length).length;
+  if (!window.confirm(`Usunąć łucznika „${a.name}”?` + (cnt ? ` Jego ${cnt} sesji zostanie w historii bez przypisania.` : ''))) return;
+  S.archers = S.archers.filter(x => x.id !== a.id); delete S.drafts[a.id]; S.arrows = [];
+  S.archerId = S.archers[0].id; S.session = openSessionFor(S.archerId);
+  saveAll(); renderArchers(); renderSession(); renderEnd(); renderHistory(); draw();
+};
+const archerSnap = () => { const a = archer(); return { name: a.name, bow: a.bow, od: a.od }; };
+
+// ---------- station UI ----------
+for (const f of C.FACES) { const o = document.createElement('option'); o.value = f.id; o.textContent = f.name; $('sFace').appendChild(o); }
+for (let k = 0; k < C.NSETS; k++) { const o = document.createElement('option'); o.value = k; o.textContent = `${k + 1}  (ID ${4 * k}–${4 * k + 3})`; $('mkSet').appendChild(o); }
+function renderStations() {
+  const tb = $('stTbl').tBodies[0]; tb.innerHTML = '';
+  const L = Object.values(S.stations).sort((p, q) => p.k - q.k);
+  $('stEmpty').style.display = L.length ? 'none' : 'block';
+  for (const st of L) {
+    const tr = document.createElement('tr'), fc = C.FACES.find(f => f.id === st.face);
+    tr.innerHTML = `<td>${esc(st.name)}${st.k === S.stationK ? ' ●' : ''}</td><td>${4 * st.k}–${4 * st.k + 3}</td><td>${fc ? fc.name.replace('WA ', '') : st.face}</td><td>${st.profile ? 'jest' : '—'}</td>`;
+    tr.style.cursor = 'pointer'; tr.onclick = () => { S.stationK = st.k; saveAll(); renderStations(); if (S.img) reprocess(); };
+    tb.appendChild(tr);
+  }
+  const st = S.stations[S.stationK];
+  $('stEdit').style.display = st ? 'block' : 'none';
+  $('stationInfo').textContent = st ? `${st.name} · ${(C.FACES.find(f => f.id === st.face) || {}).name || ''}`.replace('WA ', '') : '—';
+  $('mkSet').value = S.stationK;
+  if (!st) return;
+  $('stTitle').textContent = `${st.name} — markery ${4 * st.k}–${4 * st.k + 3}`;
+  $('sName').value = st.name; $('sFace').value = st.face; $('sW').value = st.W; $('sH').value = st.H;
+  refreshProfile();
+}
+const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+for (const [id, key, num] of [['sName', 'name'], ['sFace', 'face'], ['sW', 'W', 1], ['sH', 'H', 1]]) {
+  $(id).addEventListener('change', e => {
+    const st = S.stations[S.stationK]; if (!st) return;
+    const v = num ? parseFloat(String(e.target.value).replace(',', '.')) : e.target.value.trim(); if (num ? !(v > 0) : !v) { renderStations(); return; }
+    if (key !== 'name' && st[key] !== v && st.profile) { st.profile = null; setMsg('Zmiana lica lub rozstawu skasowała profil tej tarczy — zostanie utworzony z najbliższego zdjęcia.', 'amber'); }
+    st[key] = v; saveAll(); renderStations(); if (S.img && key !== 'name') reprocess();
   });
 }
 function refreshProfile() {
-  const p = S.profile;
+  const p = S.stations[S.stationK] && S.stations[S.stationK].profile;
   $('profInfo').textContent = p
-    ? `Profil: ${new Date(p.date).toLocaleString('pl-PL')} · środek lica ${p.c[0].toFixed(1)} / ${p.c[1].toFixed(1)} mm w układzie markerów · korekta skali ${((p.s - 1) * 100).toFixed(2)}% · owalność ${p.ovality.toFixed(3)}`
-    : 'Brak profilu stanowiska. Powstanie automatycznie z pierwszego zdjęcia albo przyciskiem poniżej.';
+    ? `Profil z ${new Date(p.date).toLocaleString('pl-PL')} · środek lica ${p.c[0].toFixed(1)} / ${p.c[1].toFixed(1)} mm · korekta skali ${((p.s - 1) * 100).toFixed(2)}% · owalność ${p.ovality.toFixed(3)}`
+    : 'Brak profilu. Powstanie automatycznie z najbliższego zdjęcia tej tarczy (najlepiej bez strzał).';
   $('profInfo').className = 'msg' + (p ? ' green' : '');
 }
-$('btnClearProf').onclick = () => { S.profile = null; saveAll(); refreshProfile(); if (S.img) reprocess(); };
-$('btnCalib').onclick = () => { if (S.reg && !S.reg.manual) { calibrateHere(); draw(); } };
+$('btnClearProf').onclick = () => { if (!S.stations[S.stationK]) return; S.profile = null; saveAll(); renderStations(); if (S.img) reprocess(); };
+$('btnCalib').onclick = () => { if (S.reg && !S.reg.manual) { calibrateHere(); renderStations(); draw(); } };
+
+// ---------- printable marker sheet ----------
+function markerSVG(id, mm) {
+  const bits = C.CODES[id], cell = mm / 6, q = cell; // quiet zone = 1 cell
+  let r = `<rect x="0" y="0" width="${mm + 2 * q}" height="${mm + 2 * q}" fill="#fff"/><rect x="${q}" y="${q}" width="${mm}" height="${mm}" fill="#000"/>`;
+  for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) if (bits[y * 4 + x]) r += `<rect x="${q + (x + 1) * cell}" y="${q + (y + 1) * cell}" width="${cell + 0.02}" height="${cell + 0.02}" fill="#fff"/>`;
+  const w = mm + 2 * q;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}mm" height="${w}mm" viewBox="0 0 ${w} ${w}" shape-rendering="crispEdges">${r}</svg>`;
+}
+$('btnSheet').onclick = () => {
+  const k = +$('mkSet').value, mm = +$('mkSize').value, ids = [0, 1, 2, 3].map(i => 4 * k + i);
+  const name = (S.stations[k] && S.stations[k].name) || `Tarcza ${k + 1}`;
+  const ruler = `<svg xmlns="http://www.w3.org/2000/svg" width="52mm" height="8mm" viewBox="0 0 52 8"><path d="M1 1v6M51 1v6M1 4h50" stroke="#000" stroke-width="0.4" fill="none"/>${[...Array(11)].map((_, i) => `<path d="M${1 + i * 5} ${i % 2 ? 3 : 2}v${i % 2 ? 2 : 4}" stroke="#000" stroke-width="0.3"/>`).join('')}</svg>`;
+  const cap = id => `<div class="cap">ArcheryNote · ${esc(name)} · marker ID ${id}</div>`;
+  let pages = '';
+  if (mm <= 66) pages = `<section><div class="grid">${ids.map(id => `<div>${markerSVG(id, mm)}${cap(id)}</div>`).join('')}</div><div class="foot">${ruler}<span>linijka 50 mm — sprawdź skalę wydruku</span></div></section>`;
+  else pages = ids.map(id => `<section><div class="one">${markerSVG(id, mm)}${cap(id)}</div><div class="foot">${ruler}<span>linijka 50 mm — sprawdź skalę wydruku</span></div></section>`).join('');
+  const html = `<!DOCTYPE html><html lang="pl"><head><meta charset="utf-8"><title>Markery — ${esc(name)}</title><style>
+@page{size:A4;margin:10mm}body{margin:0;font:11pt system-ui,sans-serif;color:#000;background:#fff}
+section{height:277mm;page-break-after:always;display:flex;flex-direction:column;justify-content:space-between}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10mm;justify-items:center;padding-top:10mm}.one{text-align:center;padding-top:20mm}
+.cap{font-size:9pt;margin-top:2mm;text-align:center}.foot{display:flex;align-items:center;gap:4mm;font-size:9pt}
+.info{padding:6mm;border:0.3mm solid #000;margin-bottom:6mm;font-size:10pt}@media screen{body{padding:10mm;background:#eee}section{background:#fff;margin-bottom:10mm;padding:10mm;height:auto;min-height:250mm}}
+</style></head><body><div class="info"><b>${esc(name)}</b> — markery ID ${ids[0]}–${ids[3]}. Przypnij po jednym w każdym rogu lica (kolejność dowolna — apka rozpoznaje rogi po położeniu). Zmierz rozstaw środków markerów w poziomie i w pionie i wpisz w ustawieniach tarczy. Drukuj w skali 100%, bez dopasowania do strony.</div>${pages}</body></html>`;
+  const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+  const w = window.open(url, '_blank');
+  if (!w) { const a = document.createElement('a'); a.href = url; a.download = `markery_tarcza${k + 1}.html`; document.body.appendChild(a); a.click(); a.remove(); }
+};
 
 // ---------- photo loading ----------
 $('btnPhoto').onclick = () => $('fileCam').click();
@@ -189,7 +366,7 @@ $('btnPhotoFile').onclick = () => $('fileAny').click();
 for (const id of ['fileCam', 'fileAny']) $(id).addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) loadPhoto(f); });
 
 function loadPhoto(file) {
-  if (S.arrows.length && !confirmSwap()) return;
+  if ((S.arrows.length || Object.entries(S.drafts).some(([id, d]) => id !== S.archerId && !d.closed && d.arrows.length)) && !confirmSwap()) return;
   S.photoTime = file.lastModified || Date.now();
   const url = URL.createObjectURL(file), im = new Image();
   im.onload = () => {
@@ -198,7 +375,7 @@ function loadPhoto(file) {
     const cx = cv.getContext('2d', { willReadFrequently: true }); cx.drawImage(im, 0, 0, cv.width, cv.height);
     URL.revokeObjectURL(url);
     S.img = cv; S.w = cv.width; S.h = cv.height; S.rgba = cx.getImageData(0, 0, S.w, S.h).data;
-    S.arrows = []; S.manualPts = null;
+    S.arrows = []; S.drafts = {}; S.manualPts = null; S.sel = null;
     $('viewWrap').style.display = 'block'; $('cardEnd').style.display = 'block';
     sizeCanvas(); fitView(); busy(true);
     setTimeout(() => { reprocess(); busy(false); renderEnd(); }, 30);
@@ -206,7 +383,7 @@ function loadPhoto(file) {
   im.onerror = () => setMsg('Nie da się odczytać zdjęcia.', 'red');
   im.src = url;
 }
-function confirmSwap() { return window.confirm('Bieżąca seria ma zapisane strzały. Zastąpić zdjęcie? (strzały zostaną usunięte)'); }
+function confirmSwap() { return window.confirm('Na tym zdjęciu są niezapisane strzały. Zastąpić zdjęcie? (niezamknięte serie zostaną usunięte)'); }
 function busy(b) { $('busy').style.display = b ? 'flex' : 'none'; }
 
 function reprocess() {
@@ -214,6 +391,7 @@ function reprocess() {
   const g = C.toGray(S.rgba, S.w, S.h);
   const markers = C.detectMarkers(g, S.w, S.h);
   const a = C.assignCorners(markers);
+  if (a.set != null) { S.stationK = a.set; station().used = Date.now(); saveAll(); renderStations(); }
   S.reg = null; $('btnCalib').disabled = true;
   if (!a.ok) { setChip('red', 'brak rejestracji'); setMsg(a.msg + ' Możesz też użyć rejestracji ręcznej.', 'red'); S.reg = { markers: a.markers, state: 'red', failed: true }; draw(); return; }
   const R = rect(), H = C.homography([[0, 0], [R[0], 0], R, [0, R[1]]], a.pts);
@@ -226,7 +404,7 @@ function reprocess() {
     const v = C.verifyProfile(S.rgba, S.w, S.h, H, R, face().D, lut, S.profile);
     S.reg.state = v.state; S.reg.verify = v;
     setChip(v.state, v.state === 'green' ? 'siatka OK' : v.state === 'amber' ? 'sprawdź siatkę' : 'siatka nie siada');
-    setMsg(v.msg + ` (${Math.round(performance.now() - t0)} ms)`, v.state);
+    setMsg(`${station().name}: ${v.msg} (${Math.round(performance.now() - t0)} ms)`, v.state);
   }
   rescoreCurrent(); draw();
 }
@@ -236,7 +414,8 @@ function calibrateHere(auto) {
   S.profile = { c: P.c, A: P.A, s: P.s, bias: P.bias, ovality: P.ovality, rect: rect(), face: S.settings.face, date: new Date().toISOString() };
   S.reg.state = 'green'; saveAll(); refreshProfile(); rescoreCurrent();
   setChip('green', 'profil zapisany');
-  setMsg(`${auto ? 'Brak profilu — utworzony z tego zdjęcia. ' : 'Profil zapisany. '}Korekta skali ${((P.s - 1) * 100).toFixed(2)}%, owalność ${P.ovality.toFixed(3)}. Sprawdź, czy pierścienie leżą na nadruku.`, 'green');
+  renderStations();
+  setMsg(`${station().name}: ${auto ? 'brak profilu — utworzony z tego zdjęcia. ' : 'profil zapisany. '}Korekta skali ${((P.s - 1) * 100).toFixed(2)}%, owalność ${P.ovality.toFixed(3)}. Sprawdź, czy pierścienie leżą na nadruku.`, 'green');
   return true;
 }
 function setChip(cls, t) { const c = $('chip'); c.className = 'chip ' + cls; c.textContent = t; }
@@ -257,7 +436,7 @@ function faceToPx(f) {
 }
 function scoreOf(f) { const r = Math.hypot(f[0], f[1]), fc = face(); return Object.assign({ r }, C.score(r, fc.D, S.settings.od, fc.min)); }
 function rescoreCurrent() { for (const a of S.arrows) if (a.px) { a.f = pxToFace(a.px); } }
-function rescoreAll() { for (const e of S.session.ends) for (const a of e.arrows) if (a.x != null) { const s = scoreOf([a.x, a.y]); a.score = s.score; a.label = s.label; } }
+function rescoreAll() { if (!S.session) return; for (const e of S.session.ends) { const fc = C.FACES.find(f => f.id === e.face) || face(); e.od = S.settings.od; for (const a of e.arrows) if (a.x != null) { const sc = C.score(Math.hypot(a.x, a.y), fc.D, e.od, fc.min); a.score = sc.score; a.label = sc.label; } } persistSession(); }
 
 // ---------- manual registration (fallback) ----------
 // tap: centre, then 3 points on the outer edge of the black zone (boundary black/white)
@@ -318,12 +497,19 @@ function drawScene(xf, scale) {
   }
   // manual points
   if (S.manualPts) for (const [i, p] of S.manualPts.entries()) { const q = xf(p); ctx.fillStyle = i ? '#4fc3f7' : '#f2c230'; ctx.beginPath(); ctx.arc(q[0], q[1], 5 * dpr, 0, 7); ctx.fill(); }
+  // other archers' arrows on this photo (gray)
+  for (const [id, d] of Object.entries(S.drafts)) {
+    if (id === S.archerId) continue;
+    const who = S.archers.find(a => a.id === id), ini = who ? who.name.slice(0, 2) : '?';
+    for (const a of d.arrows) { if (!a.px) continue; const q = xf(a.px); ctx.fillStyle = '#9aa4ad99'; ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5 * dpr; ctx.beginPath(); ctx.arc(q[0], q[1], 4 * dpr, 0, 7); ctx.fill(); ctx.stroke();
+      ctx.font = `600 ${11 * dpr}px system-ui`; ctx.fillStyle = '#cfd6dc'; ctx.fillText(ini, q[0] + 6 * dpr, q[1] + 12 * dpr); }
+  }
   // arrows
   const pxPerMm = S.reg && S.reg.H && S.profile ? mmScaleAt() : null;
   S.arrows.forEach((a, i) => {
     if (!a.px) return; const q = xf(a.px);
     const rr = Math.max(4 * dpr, pxPerMm ? S.settings.od / 2 * pxPerMm * scale : 0);
-    ctx.lineWidth = 2 * dpr; ctx.strokeStyle = '#000'; ctx.fillStyle = '#ff2d95cc';
+    ctx.lineWidth = 2 * dpr; ctx.strokeStyle = S.sel === i ? '#fff' : '#000'; ctx.fillStyle = S.sel === i ? '#f2c230' : '#ff2d95cc';
     ctx.beginPath(); ctx.arc(q[0], q[1], rr, 0, 7); ctx.fill(); ctx.stroke();
     ctx.font = `700 ${13 * dpr}px system-ui`; ctx.fillStyle = '#fff'; ctx.strokeStyle = '#000'; ctx.lineWidth = 3 * dpr;
     const lbl = (i + 1) + (a.f ? '·' + scoreOf(a.f).label : '');
@@ -339,10 +525,11 @@ function draw() {
   const v = S.view; ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(S.img, v.tx, v.ty, S.w * v.s, S.h * v.s);
   drawScene(toScreen, v.s);
+  if (S.drag && S.drag.aim && !S.drag.arrow) { const q = toScreen(S.drag.p); ctx.strokeStyle = '#ff2d95'; ctx.lineWidth = 2 * dpr; ctx.beginPath(); ctx.arc(q[0], q[1], 6 * dpr, 0, 7); ctx.stroke(); }
   if (S.loupe) drawLoupe(S.loupe);
 }
 function drawLoupe(p) {
-  const R = 70 * dpr, Z = Math.max(3, S.view.s * 3.5) , q = toScreen(p);
+  const R = 75 * dpr, Z = Math.min(Math.max(S.view.s * 5, 2 * dpr), 10), q = toScreen(p);
   let cx = q[0], cy = q[1] - 110 * dpr; if (cy - R < 0) cy = q[1] + 110 * dpr;
   cx = Math.min(Math.max(cx, R + 4), cv.width - R - 4);
   ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7); ctx.clip();
@@ -352,56 +539,68 @@ function drawLoupe(p) {
   drawScene(xf, Z);
   ctx.strokeStyle = '#fff'; ctx.lineWidth = 1 * dpr; ctx.beginPath(); ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy); ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R); ctx.stroke();
   ctx.restore(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2 * dpr; ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7); ctx.stroke();
-  const a = S.drag && S.drag.arrow; if (a && a.f) { const s = scoreOf(a.f); ctx.font = `700 ${14 * dpr}px system-ui`; ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.fillText(`${s.label} · r ${s.r.toFixed(1)} mm`, cx, cy + R + 16 * dpr); ctx.textAlign = 'start'; }
+  const fp = S.drag && S.drag.aim ? pxToFace(S.drag.p) : null; if (fp) { const s = scoreOf(fp); ctx.font = `700 ${14 * dpr}px system-ui`; ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.fillText(`${s.label} · r ${s.r.toFixed(1)} mm`, cx, cy + R + 16 * dpr); ctx.textAlign = 'start'; }
 }
 
 // ---------- pointer interaction ----------
+// one finger / left mouse: press = loupe, move = aim, release = place (or move an existing arrow)
+// two fingers: pan + zoom; mouse: wheel = zoom, right/middle drag = pan
 const ptrs = new Map();
+const evPt = e => [e.offsetX * dpr, e.offsetY * dpr];
+cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('pointerdown', e => {
   cv.setPointerCapture(e.pointerId);
-  const q = [e.offsetX * dpr, e.offsetY * dpr]; ptrs.set(e.pointerId, q);
-  if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; S.drag = { pinch: true, d0: Math.hypot(a[0] - b[0], a[1] - b[1]), m0: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], v0: { ...S.view } }; S.loupe = null; draw(); return; }
-  const p = toImg(q);
-  // hit test arrows
-  let hit = null, best = 18 * dpr;
-  for (const a of S.arrows) if (a.px) { const s = toScreen(a.px), d = Math.hypot(s[0] - q[0], s[1] - q[1]); if (d < best) { best = d; hit = a; } }
-  if (hit) S.drag = { arrow: hit, off: [hit.px[0] - p[0], hit.px[1] - p[1]], q0: q, moved: false };
-  else S.drag = { pan: true, q0: q, v0: { ...S.view }, moved: false };
+  const q = evPt(e); ptrs.set(e.pointerId, q);
+  if (ptrs.size === 2) { // cancel aiming, start pinch
+    const [a, b] = [...ptrs.values()];
+    if (S.drag && S.drag.aim && S.drag.arrow) S.drag.arrow.px = S.drag.orig;
+    S.drag = { pinch: true, d0: Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, m0: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], v0: { ...S.view } };
+    S.loupe = null; rescoreCurrent(); draw(); return;
+  }
+  if (e.pointerType === 'mouse' && e.button !== 0) { S.drag = { pan: true, q0: q, v0: { ...S.view } }; return; }
+  const p = toImg(q), sel = S.sel != null ? S.arrows[S.sel] : null;
+  S.drag = sel ? { aim: true, arrow: sel, orig: sel.px, off: [0, 0], p } : { aim: true, arrow: null, off: [0, 0], p };
+  if (sel) { sel.px = p; sel.f = pxToFace(p); if (sel.state === 'miss') sel.state = 'hit'; }
+  S.loupe = S.drag.p; draw();
 });
 cv.addEventListener('pointermove', e => {
   if (!ptrs.has(e.pointerId)) return;
-  const q = [e.offsetX * dpr, e.offsetY * dpr]; ptrs.set(e.pointerId, q);
+  const q = evPt(e); ptrs.set(e.pointerId, q);
   const D = S.drag; if (!D) return;
   if (D.pinch && ptrs.size === 2) {
     const [a, b] = [...ptrs.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]), m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-    const k = d / D.d0, s = Math.min(Math.max(D.v0.s * k, 0.05), 12);
+    const s = Math.min(Math.max(D.v0.s * d / D.d0, fitScale() * 0.8), 12);
     const ip = [(D.m0[0] - D.v0.tx) / D.v0.s, (D.m0[1] - D.v0.ty) / D.v0.s];
     S.view = { s, tx: m[0] - ip[0] * s, ty: m[1] - ip[1] * s }; draw();
-  } else if (D.arrow) {
-    if (!D.moved && Math.hypot(q[0] - D.q0[0], q[1] - D.q0[1]) < 6 * dpr) return;
-    D.moved = true; const p = toImg(q); D.arrow.px = [p[0] + D.off[0], p[1] + D.off[1]]; D.arrow.f = pxToFace(D.arrow.px); S.loupe = D.arrow.px; draw();
+  } else if (D.aim) {
+    const p = toImg(q); D.p = [p[0] + D.off[0], p[1] + D.off[1]];
+    if (D.arrow) { D.arrow.px = D.p; D.arrow.f = pxToFace(D.p); }
+    S.loupe = D.p; draw();
   } else if (D.pan) {
-    const dx = q[0] - D.q0[0], dy = q[1] - D.q0[1];
-    if (Math.hypot(dx, dy) > 8 * dpr) D.moved = true;
-    if (D.moved) { S.view = { ...D.v0, tx: D.v0.tx + dx, ty: D.v0.ty + dy }; draw(); }
+    S.view = { ...D.v0, tx: D.v0.tx + q[0] - D.q0[0], ty: D.v0.ty + q[1] - D.q0[1] }; draw();
   }
 });
 function endPtr(e) {
   if (!ptrs.has(e.pointerId)) return;
-  const q = ptrs.get(e.pointerId); ptrs.delete(e.pointerId);
+  ptrs.delete(e.pointerId);
   const D = S.drag;
   if (D && D.pinch) { if (ptrs.size === 0) S.drag = null; return; }
   S.drag = null; S.loupe = null;
-  if (D && D.arrow) { if (!D.moved && e.type === 'pointerup') tap(toImg(q)); renderEnd(); draw(); return; }
-  if (D && D.pan && !D.moved && e.type === 'pointerup') tap(toImg(q));
+  if (D && D.aim) {
+    if (e.type !== 'pointerup') { if (D.arrow) { D.arrow.px = D.orig; D.arrow.f = pxToFace(D.orig); } }
+    else if (!D.arrow) tap(D.p);
+    else S.sel = null;
+    renderEnd();
+  }
   draw();
 }
 cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
 cv.addEventListener('wheel', e => {
-  e.preventDefault(); const q = [e.offsetX * dpr, e.offsetY * dpr], ip = toImg(q);
-  const s = Math.min(Math.max(S.view.s * Math.exp(-e.deltaY * 0.0015), 0.05), 12);
+  e.preventDefault(); const q = evPt(e), ip = toImg(q);
+  const s = Math.min(Math.max(S.view.s * Math.exp(-e.deltaY * 0.0015), fitScale() * 0.8), 12);
   S.view = { s, tx: q[0] - ip[0] * s, ty: q[1] - ip[1] * s }; draw();
 }, { passive: false });
+const fitScale = () => Math.min(cv.width / S.w, cv.height / S.h);
 
 function tap(p) {
   if (S.manualPts) {
@@ -419,12 +618,13 @@ function tap(p) {
   renderEnd(); draw();
 }
 $('btnMiss').onclick = () => { S.arrows.push({ px: null, f: null, state: 'miss' }); renderEnd(); draw(); };
-$('btnUndo').onclick = () => { S.arrows.pop(); renderEnd(); draw(); };
+$('btnUndo').onclick = () => { S.arrows.pop(); S.sel = null; renderEnd(); draw(); };
 
 // ---------- end table ----------
 function arrowScore(a) { return a.state === 'miss' || !a.f ? { score: 0, label: 'M', r: null } : scoreOf(a.f); }
 const fx0 = v => { const t = v.toFixed(0); return t === '-0' ? '0' : t; };
 function renderEnd() {
+  if (!S.session) return;
   const tb = $('arrowTbl').tBodies[0]; tb.innerHTML = ''; let sum = 0;
   S.arrows.forEach((a, i) => {
     const s = arrowScore(a); sum += s.score;
@@ -432,7 +632,10 @@ function renderEnd() {
     tr.innerHTML = `<td>${i + 1}</td><td class="sc ${s.score === 10 ? 'sc10' : s.score === 0 ? 'scM' : ''}">${s.label}</td><td>${s.r != null ? s.r.toFixed(1) : '—'}</td><td>${a.f ? fx0(a.f[0]) + ' / ' + fx0(-a.f[1]) : '—'}</td><td><button class="ghost" data-i="${i}" style="padding:3px 8px">✕</button></td>`;
     tb.appendChild(tr);
   });
-  tb.querySelectorAll('button').forEach(b => b.onclick = () => { S.arrows.splice(+b.dataset.i, 1); renderEnd(); draw(); });
+  tb.querySelectorAll('button').forEach(b => b.onclick = ev => { ev.stopPropagation(); S.arrows.splice(+b.dataset.i, 1); S.sel = null; renderEnd(); draw(); });
+  [...tb.rows].forEach((tr, i) => { tr.style.cursor = 'pointer'; if (S.sel === i) tr.style.background = '#3a2a3a'; tr.onclick = () => { S.sel = S.sel === i ? null : i; renderEnd(); draw(); }; });
+  $('selHint').style.display = S.sel != null ? 'block' : 'none';
+  if (S.sel != null) $('selHint').textContent = `Poprawiasz strzałę ${S.sel + 1}: dotknij tarczy, przesuń na właściwe miejsce i puść. Stuknij wiersz ponownie, żeby anulować.`;
   $('endSum').textContent = sum; $('endNo').textContent = S.session.ends.length + 1;
   $('endInfo').textContent = `${S.arrows.length} / ${S.settings.n} strzał`;
 }
@@ -441,61 +644,165 @@ $('btnCloseEnd').onclick = () => {
   if (S.arrows.length !== S.settings.n && !window.confirm(`Seria ma ${S.arrows.length} strzał zamiast ${S.settings.n}. Zapisać mimo to?`)) return;
   const e = {
     nr: S.session.ends.length + 1, time: S.photoTime || Date.now(),
-    face: S.settings.face, dist: S.settings.dist, od: S.settings.od, n: S.settings.n,
+    face: S.settings.face, dist: S.settings.dist, od: S.settings.od, n: S.settings.n, station: S.reg && !S.reg.manual ? station().name : null,
     reg: S.reg ? (S.reg.manual ? 'manual' : S.reg.state) : 'none', dev: S.reg && S.reg.verify ? S.reg.verify.dev : null,
     arrows: S.arrows.map((a, i) => { const s = arrowScore(a); return { nr: i + 1, x: a.f ? +a.f[0].toFixed(1) : null, y: a.f ? +(-a.f[1]).toFixed(1) : null, score: s.score, label: s.label, state: a.state === 'miss' ? 'pudlo' : 'trafiona' }; })
   };
-  S.session.ends.push(e); saveAll();
-  S.arrows = []; S.img = null; S.reg = null; $('viewWrap').style.display = 'none'; $('cardEnd').style.display = 'none';
-  setChip('', 'seria zapisana'); setMsg(`Seria ${e.nr} zapisana: ${e.arrows.reduce((s, a) => s + a.score, 0)} pkt. Kolejne zdjęcie po następnej serii.`, 'green');
-  renderEnd(); renderSession(); window.scrollTo({ top: 0, behavior: 'smooth' });
+  S.session.ends.push(e); if (S.session.ends.length === 1) S.session.date = new Date(e.time).toISOString(); persistSession();
+  S.drafts[S.archerId] = { arrows: S.arrows, closed: true }; S.arrows = []; S.sel = null;
+  const multi = S.archers.length > 1;
+  setChip('', 'seria zapisana');
+  setMsg(`${archer().name}: seria ${e.nr} zapisana, ${e.arrows.reduce((s, a) => s + a.score, 0)} pkt. ` + (multi ? 'Wybierz kolejnego łucznika, żeby wskazać jego strzały na tym samym zdjęciu, albo zrób zdjęcie następnej serii.' : 'Kolejne zdjęcie po następnej serii.'), 'green');
+  renderArchers(); renderEnd(); renderSession(); draw();
+  if (!multi) { S.img = null; S.reg = null; S.drafts = {}; $('viewWrap').style.display = 'none'; $('cardEnd').style.display = 'none'; }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
-// ---------- session ----------
-function groupStats(arrs) {
-  const P = arrs.filter(a => a.x != null); if (P.length < 2) return null;
-  const mx = P.reduce((s, a) => s + a.x, 0) / P.length, my = P.reduce((s, a) => s + a.y, 0) / P.length;
-  const sd = Math.sqrt(P.reduce((s, a) => s + (a.x - mx) ** 2 + (a.y - my) ** 2, 0) / (P.length - 1));
-  return { mx, my, sd };
+// ---------- history (IndexedDB) ----------
+const DB = (() => {
+  let dbp = null, mem = new Map();
+  const open = () => dbp || (dbp = new Promise((res, rej) => {
+    try { const r = indexedDB.open('archerynote', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('sessions', { keyPath: 'id' });
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+    } catch (e) { rej(e); }
+  }));
+  const tx = (mode, fn) => open().then(db => new Promise((res, rej) => { const t = db.transaction('sessions', mode), st = t.objectStore('sessions'), out = fn(st); t.oncomplete = () => res(out && out.result); t.onerror = () => rej(t.error); }));
+  return {
+    put: s => tx('readwrite', st => st.put(JSON.parse(JSON.stringify(s)))).catch(() => { mem.set(s.id, s); }),
+    all: () => tx('readonly', st => st.getAll()).then(r => r || []).catch(() => [...mem.values()]),
+    del: id => tx('readwrite', st => st.delete(id)).catch(() => { mem.delete(id); })
+  };
+})();
+let history = [];
+async function loadHistory() {
+  history = await DB.all();
+  // migrate v0.1 session from localStorage
+  const legacy = store.get('session', null);
+  if (legacy && legacy.ends && legacy.ends.length && !history.some(h => h.id === legacy.id)) { legacy.status = legacy.status || 'robocza'; await DB.put(legacy); history.push(legacy); }
+  try { localStorage.removeItem('an.session'); } catch (e) {}
+  // v0.2 sessions have no archer: assign them to the first archer
+  for (const h of history) if (!h.archerId) { h.archerId = S.archers[0].id; h.archer = h.archer || { name: S.archers[0].name, bow: S.archers[0].bow, od: (h.ends[0] || {}).od }; await DB.put(h); }
+  S.session = openSessionFor(S.archerId);
+  renderSession(); renderEnd(); renderHistory();
 }
+function newSession() { return { id: 's' + Date.now() + Math.random().toString(36).slice(2, 5), date: new Date().toISOString(), status: 'robocza', archerId: S.archerId, archer: archerSnap(), face: S.settings.face, dist: S.settings.dist, ends: [] }; }
+function openSessionFor(id) {
+  return history.filter(h => h.status !== 'zamknieta' && h.archerId === id).sort((x, y) => new Date(y.date) - new Date(x.date))[0] || newSession();
+}
+function persistSession() {
+  if (!S.session.ends.length) return;
+  DB.put(S.session); const i = history.findIndex(h => h.id === S.session.id);
+  if (i >= 0) history[i] = S.session; else history.push(S.session);
+  renderHistory();
+}
+
+// ---------- session ----------
 function renderSession() {
+  if (!S.session) return;
   const E = S.session.ends, tb = $('endsTbl').tBodies[0]; tb.innerHTML = '';
-  let tot = 0, n = 0, x = 0, t10 = 0, m = 0; const all = [];
-  for (const e of E) {
-    const sum = e.arrows.reduce((s, a) => s + a.score, 0); tot += sum; n += e.arrows.length;
-    for (const a of e.arrows) { if (a.label === 'X') x++; if (a.score === 10) t10++; if (a.score === 0) m++; all.push(a); }
-    const g = groupStats(e.arrows);
+  const sm = ANStats.summary(S.session);
+  for (const e of sm.ends) {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${e.nr}</td><td>${e.arrows.map(a => a.label).join(' ')}</td><td class="sc">${sum}</td><td>${g ? fmtXY(g.mx, g.my) : '—'}</td><td>${g ? g.sd.toFixed(0) : '—'}</td>`;
+    tr.innerHTML = `<td>${e.nr}</td><td>${E.find(x => x.nr === e.nr).arrows.map(a => a.label).join(' ')}</td><td class="sc">${e.sum}</td><td>${e.mx != null ? fmtXY(e.mx, e.my) : '—'}</td><td>${e.d90 != null ? e.d90.toFixed(0) : '—'}</td>`;
     tb.appendChild(tr);
   }
-  const g = groupStats(all);
-  const dur = E.length > 1 ? (E[E.length - 1].time - E[0].time) / 60000 : null;
   $('sessStats').innerHTML = [
-    ['Suma', tot], ['Średnia/strzałę', n ? (tot / n).toFixed(2) : '—'], ['Strzał', n], ['10 / X', `${t10} / ${x}`], ['Pudła', m],
-    ['Środek grupy', g ? fmtXY(g.mx, g.my) : '—'], ['Skupienie σ', g ? g.sd.toFixed(0) + ' mm' : '—'], ['Czas', dur != null ? dur.toFixed(0) + ' min' : '—']
+    ['Suma', sm.sum], ['Średnia/strzałę', sm.avg != null ? sm.avg.toFixed(2) : '—'], ['Strzał', sm.n], ['10 / X', `${sm.tens} / ${sm.xs}`], ['Pudła', sm.misses],
+    ['Środek grupy', sm.mx != null ? fmtXY(sm.mx, sm.my) : '—'], ['Grupa 90%', sm.d90 != null ? sm.d90.toFixed(0) + ' mm' : '—'], ['Czas', sm.minutes != null ? sm.minutes.toFixed(0) + ' min' : '—']
   ].map(([k, v]) => `<div class="stat"><small>${k}</small><span>${v}</span></div>`).join('');
+  $('btnSummary').disabled = $('btnEndSess').disabled = !E.length;
 }
 function fmtXY(x, y) { return `${Math.abs(x).toFixed(0)} ${x >= 0 ? 'P' : 'L'} / ${Math.abs(y).toFixed(0)} ${y >= 0 ? 'G' : 'D'}`; }
-$('btnNewSess').onclick = () => { if (S.session.ends.length && !window.confirm('Zacząć nową sesję? Bieżąca zniknie z telefonu — wyeksportuj ją najpierw, jeśli chcesz ją zachować.')) return; S.session = newSession(); saveAll(); renderSession(); renderEnd(); };
+$('btnSummary').onclick = () => showCard(S.session);
+$('btnEndSess').onclick = () => {
+  if (!S.session.ends.length) return;
+  if (S.arrows.length && !window.confirm('Bieżąca seria nie jest zamknięta i nie wejdzie do sesji. Zakończyć mimo to?')) return;
+  S.session.status = 'zamknieta'; S.session.closed = new Date().toISOString();
+  persistSession(); const done = S.session;
+  S.session = newSession(); S.arrows = []; S.drafts = {}; S.img = null; S.reg = null;
+  $('viewWrap').style.display = 'none'; $('cardEnd').style.display = 'none'; setChip('', 'sesja zamknięta');
+  renderSession(); renderEnd(); showCard(done);
+};
+
+function renderHistory() {
+  const all = $('histAll').checked;
+  const L = history.filter(h => h.ends && h.ends.length && (all || h.archerId === S.archerId)).sort((x, y) => new Date(y.date) - new Date(x.date));
+  const tb = $('histTbl').tBodies[0]; tb.innerHTML = '';
+  $('histEmpty').style.display = L.length ? 'none' : 'block';
+  for (const h of L) {
+    const sm = ANStats.summary(h), d = new Date(h.date), tr = document.createElement('tr');
+    const fc = C.FACES.find(f => f.id === sm.face);
+    tr.innerHTML = `<td>${d.toLocaleDateString('pl-PL')}${all && h.archer ? ' · ' + esc(h.archer.name) : ''}${h.status === 'zamknieta' ? '' : ' <span class="hint">(w toku)</span>'}</td><td>${fc ? fc.name.replace('WA ', '') : sm.face} · ${sm.dist} m</td><td>${sm.n}</td><td class="sc">${sm.avg != null ? sm.avg.toFixed(2) : '—'}</td><td>${sm.d90 != null ? sm.d90.toFixed(0) : '—'}</td>`;
+    tr.style.cursor = 'pointer'; tr.onclick = () => showCard(h);
+    tb.appendChild(tr);
+  }
+}
+
+// ---------- summary card ----------
+let cardSession = null;
+function showCard(sess) {
+  cardSession = sess;
+  $('cardBox').innerHTML = ANStats.cardSVG(sess, history);
+  const svg = $('cardBox').querySelector('svg'); svg.removeAttribute('width'); svg.removeAttribute('height'); svg.style.width = '100%'; svg.style.height = 'auto';
+  // tap a series (bar or point) to highlight its arrows on the target
+  let sel = null;
+  svg.querySelectorAll('.bar').forEach(g => g.addEventListener('click', () => {
+    sel = sel === g.dataset.end ? null : g.dataset.end;
+    svg.querySelectorAll('.dot').forEach(d => d.setAttribute('opacity', !sel || d.dataset.end === sel ? 1 : 0.15));
+    svg.querySelectorAll('.bar').forEach(b => b.setAttribute('opacity', !sel || b.dataset.end === sel ? 1 : 0.4));
+  }));
+  $('btnDelSess').style.display = sess.status === 'zamknieta' ? '' : 'none';
+  $('overlay').style.display = 'block'; document.body.style.overflow = 'hidden'; $('overlay').scrollTop = 0;
+}
+$('btnCardClose').onclick = () => { $('overlay').style.display = 'none'; document.body.style.overflow = ''; };
+$('btnDelSess').onclick = async () => {
+  if (!cardSession || !window.confirm('Usunąć tę sesję z historii w telefonie? Tego nie da się cofnąć (chyba że masz eksport).')) return;
+  await DB.del(cardSession.id); history = history.filter(h => h.id !== cardSession.id); renderHistory(); $('btnCardClose').onclick();
+};
+$('btnCardPng').onclick = async () => {
+  const svgTxt = ANStats.cardSVG(cardSession, history), m = svgTxt.match(/viewBox="0 0 (\d+) (\d+)"/), W = +m[1], H = +m[2], k = 3;
+  const img = new Image(), url = URL.createObjectURL(new Blob([svgTxt], { type: 'image/svg+xml' }));
+  await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
+  const c = document.createElement('canvas'); c.width = W * k; c.height = H * k;
+  const x = c.getContext('2d'); x.scale(k, k); x.drawImage(img, 0, 0, W, H); URL.revokeObjectURL(url);
+  const blob = await new Promise(r => { try { c.toBlob(r, 'image/png'); } catch (e) { r(null); } });
+  if (!blob) { alert('Ta przeglądarka nie pozwala zapisać karty jako obrazka — zrób zrzut ekranu.'); return; }
+  const name = `archerynote_${cardSession.date.slice(0, 10)}.png`, file = new File([blob], name, { type: 'image/png' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file], title: 'Podsumowanie treningu' }); return; } catch (e) { if (e.name === 'AbortError') return; } }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+};
+
+// ---------- export / import (whole history) ----------
 $('btnExport').onclick = () => {
-  const data = { app: 'ArcheryNote', version: 1, exported: new Date().toISOString(), settings: S.settings, profile: S.profile, session: S.session };
+  const data = { app: 'ArcheryNote', version: 3, exported: new Date().toISOString(), archers: S.archers, stations: S.stations, sessions: history.filter(h => h.ends && h.ends.length) };
   const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' }), a = document.createElement('a');
-  a.href = URL.createObjectURL(blob); a.download = `archerynote_${S.session.date.slice(0, 10)}.json`; document.body.appendChild(a); a.click(); a.remove();
+  a.href = URL.createObjectURL(blob); a.download = `archerynote_${new Date().toISOString().slice(0, 10)}.json`; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 };
 $('btnImport').onclick = () => $('fileImport').click();
 $('fileImport').addEventListener('change', e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
-  f.text().then(t => {
-    const d = JSON.parse(t); if (d.app !== 'ArcheryNote' || !d.session) throw new Error('format');
-    if (S.session.ends.length && !window.confirm('Zastąpić bieżącą sesję importowaną?')) return;
-    S.session = d.session; if (d.profile && window.confirm('Plik zawiera profil stanowiska. Wczytać go też?')) S.profile = d.profile;
-    saveAll(); refreshProfile(); renderSession(); renderEnd();
+  f.text().then(async t => {
+    const d = JSON.parse(t); if (d.app !== 'ArcheryNote') throw new Error('format');
+    const list = d.sessions || (d.session ? [Object.assign({ status: 'zamknieta' }, d.session)] : []);
+    let added = 0, skipped = 0, newArchers = 0, newStations = 0;
+    for (const a of d.archers || []) if (!S.archers.some(x => x.id === a.id)) { S.archers.push(a); newArchers++; }
+    for (const st of Object.values(d.stations || {})) if (!S.stations[st.k]) { S.stations[st.k] = st; newStations++; }
+    if (!d.stations && d.profile && !S.profile && window.confirm('Plik zawiera profil stanowiska, a bieżąca tarcza go nie ma. Wczytać?')) S.profile = d.profile;
+    for (const s of list) {
+      if (history.some(h => h.id === s.id)) { skipped++; continue; }
+      s.status = s.status || 'zamknieta';
+      if (!s.archerId || !S.archers.some(a => a.id === s.archerId)) { s.archerId = S.archerId; s.archer = archerSnap(); }
+      await DB.put(s); history.push(s); added++;
+    }
+    saveAll(); renderArchers(); renderStations(); renderHistory();
+    alert(`Zaimportowano sesji: ${added}` + (skipped ? `, pominięto istniejących: ${skipped}` : '') + (newArchers ? `, łuczników: ${newArchers}` : '') + (newStations ? `, tarcz: ${newStations}` : '') + (d.archers ? '' : '. Sesje bez łucznika przypisano do: ' + archer().name));
   }).catch(() => alert('To nie jest plik ArcheryNote.'));
 });
 
-refreshProfile(); renderSession(); renderEnd();
+$('histAll').addEventListener('change', renderHistory);
+renderArchers(); renderStations(); loadHistory();
 window.__AN = S; // debug hook
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 })();

@@ -4,9 +4,58 @@
 (function (root) {
 'use strict';
 
-// ---------- ArUco DICT_4X4_50, IDs 0–3 (row-major, 1 = white) ----------
-const CODES = ['1011010100110010', '0000111110011010', '0011001100101101', '1001100101000110']
-  .map(s => s.split('').map(Number));
+// ---------- ArUco DICT_4X4_50, IDs 0–47 (row-major, 1 = white); target k uses IDs 4k..4k+3 ----------
+const CODES = [
+  '1011010100110010',
+  '0000111110011010',
+  '0011001100101101',
+  '1001100101000110',
+  '0101010010011110',
+  '0111100111001101',
+  '1001111000101110',
+  '1100010011110010',
+  '1111111011011010',
+  '1100111101010110',
+  '1111100110010001',
+  '0001000110100111',
+  '0000111010110111',
+  '0010101000001111',
+  '0010010010110001',
+  '0010011000111110',
+  '0100011001100101',
+  '0110011000000000',
+  '0110110001011110',
+  '0111011010101111',
+  '1000011010001011',
+  '1011000000101011',
+  '1100110011010101',
+  '1101110110000010',
+  '1111111001000111',
+  '1001010001110001',
+  '1010110011100100',
+  '1010010101010100',
+  '0010000100100011',
+  '0011010001101111',
+  '0100010000010101',
+  '0101011110110010',
+  '1001111011001111',
+  '1111000011001011',
+  '0000100010101110',
+  '0000100100101001',
+  '0001100001110101',
+  '0000010011111111',
+  '0000110111110110',
+  '0001110001011010',
+  '0001011100011000',
+  '0010101000101000',
+  '0011001010001100',
+  '0011100010110010',
+  '0010010011101000',
+  '0010111011101011',
+  '0010110100111111',
+  '0100101101100100'
+].map(s => s.split('').map(Number));
+const NSETS = 12;
 
 function rot90(b) { // rotate 4x4 clockwise
   const r = new Array(16);
@@ -179,7 +228,7 @@ function decodeQuad(g, w, h, Q) {
   if (borderErr > 2) return null;
   const inner = []; for (let y = 1; y < 5; y++) for (let x = 1; x < 5; x++) inner.push(bit[y * 6 + x]);
   let best = null;
-  for (let id = 0; id < 4; id++) for (let r = 0; r < 4; r++) {
+  for (let id = 0; id < CODES.length; id++) for (let r = 0; r < 4; r++) {
     let d = 0; const c = CODE_ROTS[id][r]; for (let i = 0; i < 16; i++) d += c[i] !== inner[i];
     if (!best || d < best.ham) best = { id, rot: r, ham: d };
   }
@@ -267,7 +316,15 @@ const CORNER_NAMES = ['lewym górnym', 'prawym górnym', 'prawym dolnym', 'lewym
 
 // Assign TL,TR,BR,BL by position (not by ID). Returns {ok, pts:[TL,TR,BR,BL], markers, msg}
 function assignCorners(markers) {
-  let M = markers.filter(m => m.id <= 3);
+  // choose the marker set (target) with most markers; ties -> lower hamming sum
+  const bySet = new Map();
+  for (const m of markers) { const k = Math.floor(m.id / 4); if (!bySet.has(k)) bySet.set(k, []); bySet.get(k).push(m); }
+  let set = null, best = null;
+  for (const [k, arr] of bySet) { const ids = new Set(arr.map(m => m.id)).size, hs = arr.reduce((s, m) => s + m.ham, 0); if (!best || ids > best[0] || (ids === best[0] && hs < best[1])) { best = [ids, hs]; set = k; } }
+  const res = assignSet(set == null ? [] : bySet.get(set));
+  res.set = set; return res;
+}
+function assignSet(M) {
   // one per ID max
   const byId = new Map(); for (const m of M) if (!byId.has(m.id) || byId.get(m.id).ham > m.ham) byId.set(m.id, m);
   M = [...byId.values()];
@@ -482,7 +539,7 @@ function calibrateFace(rgba, w, h, Hpx, rect, D, lut) {
   const A = S.map(v => v / s);
   const tr = N[0] + N[2], ev1 = tr / 2 + Math.sqrt(tr * tr / 4 - 1), ovality = Math.sqrt(ev1 / (1 / ev1));
   const centreSpread = Math.max(...good.map(k => Math.hypot(fits[k].c[0] - cx, fits[k].c[1] - cy)));
-  if (Math.abs(s - 1) > 0.1) return { ok: false, msg: `Skala odbiega o ${((s - 1) * 100).toFixed(0)}% od oczekiwanej — sprawdź wybrany rozmiar lica i rozstaw markerów.`, s };
+  if (Math.abs(s - 1) > 0.2) return { ok: false, msg: `Skala odbiega o ${((s - 1) * 100).toFixed(0)}% od oczekiwanej — sprawdź wybrany rozmiar lica i rozstaw markerów.`, s };
   return {
     ok: true, c: [cx, cy], A, s, bias: b, ovality, centreSpread,
     fits: fits.map((f, k) => f && { k, n: f.n, rm: f.rm, rms: f.rms, c: f.c, expected: Rk[k] }), pts
@@ -508,6 +565,6 @@ function verifyProfile(rgba, w, h, Hpx, rect, D, lut, P) {
   return { state, dev, dScale, fit: Q, msg };
 }
 
-const API = { colorRef, makeLUT, CODES, FACES, toGray, detectMarkers, assignCorners, homography, apply, inv, mul, calibrateFace, verifyProfile, mmToFace, faceToMm, score, classify, rectify, CORNER_NAMES };
+const API = { NSETS, colorRef, makeLUT, CODES, FACES, toGray, detectMarkers, assignCorners, homography, apply, inv, mul, calibrateFace, verifyProfile, mmToFace, faceToMm, score, classify, rectify, CORNER_NAMES };
 if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.ANCore = API;
 })(typeof window !== 'undefined' ? window : globalThis);
