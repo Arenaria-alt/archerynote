@@ -48,7 +48,7 @@ details summary{cursor:pointer;color:var(--mut);font-size:13px}
 .hint{font-size:12px;color:var(--mut)}
 .sc10{color:var(--acc)}.scM{color:var(--bad)}
 #overlay{position:fixed;inset:0;z-index:20;background:var(--bg);overflow:auto;display:none;padding:0 10px;padding-top:env(safe-area-inset-top)}
-.ovbar{position:sticky;top:0;display:flex;gap:8px;padding:10px 0;background:var(--bg);z-index:2}
+.ovbar{position:sticky;top:0;display:flex;flex-wrap:wrap;gap:8px;padding:10px 0;background:var(--bg);z-index:2}
 #cardBox{max-width:520px;margin:0 auto}
 #cardBox .bar{cursor:pointer}
 #histTbl tr:hover td{background:#262e36}
@@ -69,6 +69,10 @@ footer{text-align:center;color:#56616b;font-size:11px;padding:20px}
     <label class="f" style="flex:2 1 160px">Łucznik<select id="archerSel"></select></label>
     <div style="flex:1 1 120px;display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--mut)">Tarcza<span id="stationInfo" style="font-weight:600;color:var(--fg);font-size:15px;padding:8px 0">—</span></div>
   </div>
+  <div class="row" style="margin-top:8px">
+    <label class="f" style="flex:1 1 0;min-width:0">Dystans [m]<input id="topDist" type="number" inputmode="decimal" style="font-size:20px;font-weight:700;padding:6px 8px;width:100%"></label>
+    <label class="f" style="flex:1 1 0;min-width:0">Strzał w serii<select id="topN" style="font-size:20px;font-weight:700;padding:6px 8px;width:100%"><option>3</option><option>6</option><option>9</option><option>12</option></select></label>
+  </div>
   <div class="hint" id="othersInfo" style="margin-top:6px;display:none"></div>
 </div>
 
@@ -80,6 +84,7 @@ footer{text-align:center;color:#56616b;font-size:11px;padding:20px}
     <input type="file" id="fileAny" accept="image/*" hidden>
     <span class="hint" id="endInfo"></span>
   </div>
+  <div class="row" style="margin-top:8px"><label class="hint" style="display:flex;gap:6px;align-items:center;flex:1"><input type="checkbox" id="savePhoto"> zapisuj zdjęcie serii w galerii (przy „Zamknij serię”)</label><button id="btnSavePhoto" class="ghost" style="display:none;padding:6px 10px">Zapisz zdjęcie</button></div>
   <div class="msg" id="regMsg">Najpierw zdjęcie tarczy z czterema markerami. Pierwsze zdjęcie sesji najlepiej bez strzał — z niego powstaje profil stanowiska.</div>
 </div>
 
@@ -96,7 +101,7 @@ footer{text-align:center;color:#56616b;font-size:11px;padding:20px}
   <h2>Seria <span id="endNo">1</span></h2>
   <div class="hint">Dotknij tarczy — pojawi się lupa z krzyżem. Przesuń palec na punkt wejścia strzały i puść. Żeby poprawić strzałę, stuknij jej wiersz w tabeli i wskaż ją jeszcze raz. Dwa palce: przesuwanie i powiększanie.</div>
   <div class="msg amber" id="selHint" style="display:none"></div>
-  <table id="arrowTbl"><thead><tr><th>#</th><th>Wynik</th><th>r [mm]</th><th>x / y [mm]</th><th></th></tr></thead><tbody></tbody></table>
+  <table id="arrowTbl"><thead><tr><th>#</th><th>Wynik</th><th>od środka [mm]</th><th>x / y [mm]</th><th></th></tr></thead><tbody></tbody></table>
   <div class="row" style="margin-top:8px">
     <button id="btnMiss">Pudło</button>
     <button id="btnUndo" class="ghost">Cofnij</button>
@@ -123,6 +128,7 @@ footer{text-align:center;color:#56616b;font-size:11px;padding:20px}
   <table id="histTbl"><thead><tr><th>Data</th><th>Lico · dystans</th><th>Strzał</th><th>Śr.</th><th>90% [mm]</th></tr></thead><tbody></tbody></table>
   <div class="hint" id="histEmpty">Zakończone sesje pojawią się tutaj. Dane są tylko w tym telefonie — eksport przenosi całą historię na drugi.</div>
   <div class="row" style="margin-top:10px">
+    <button id="btnTrend" class="pri">Postępy</button>
     <button id="btnExport">Eksport JSON</button>
     <button id="btnImport" class="ghost">Import</button>
     <input type="file" id="fileImport" accept="application/json,.json" hidden>
@@ -137,11 +143,11 @@ footer{text-align:center;color:#56616b;font-size:11px;padding:20px}
       <label class="f">Łuk<select id="aBow"><option>klasyczny</option><option>bloczkowy</option><option>goły</option><option>tradycyjny</option><option>inny</option></select></label>
     </div>
     <div class="row" style="margin-top:8px">
-      <label class="f">Średnica zewn. trzonka [mm]<input id="aOD" type="number" step="0.01" inputmode="decimal"></label>
+      <label class="f">Średnica promienia strzały [mm]<input id="aOD" type="number" step="0.01" inputmode="decimal"></label>
       <label class="f">Strzał w serii<select id="aN"><option>3</option><option>6</option><option>9</option><option>12</option></select></label>
       <label class="f">Dystans [m]<input id="aDist" type="number" inputmode="decimal"></label>
     </div>
-    <div class="hint" style="margin-top:6px">Średnica trzonka — zmierzona suwmiarką, nie z oznaczenia (ID 4,2 ma OD ok. 5,2–5,8 mm). Zmiana przelicza bieżącą sesję.</div>
+    <div class="hint" style="margin-top:6px">Promień (brzechwa) strzały: średnica zewnętrzna zmierzona suwmiarką, nie z oznaczenia — „4,2” to średnica wewnętrzna, zewnętrzna wynosi ok. 5,2–5,8 mm. Zmiana przelicza bieżącą sesję.</div>
     <div class="row" style="margin-top:10px">
       <button id="btnAddArcher">Nowy łucznik</button>
       <button id="btnDelArcher" class="ghost" style="margin-left:auto">Usuń łucznika</button>
@@ -207,12 +213,15 @@ footer{text-align:center;color:#56616b;font-size:11px;padding:20px}
   <div class="ovbar">
     <button id="btnCardClose" class="ghost">Zamknij</button>
     <button id="btnDelSess" class="ghost">Usuń</button>
+    <button id="btnSessDist" class="ghost">Dystans</button>
+
     <button id="btnCardPng" class="pri" style="margin-left:auto">Udostępnij PNG</button>
+    <select id="trSel" style="display:none;flex:1 1 100%;order:9"></select>
   </div>
   <div id="cardBox"></div>
-  <div class="hint" style="padding:8px 4px 30px">Dotknij słupka albo punktu serii, żeby podświetlić jej strzały na tarczy.</div>
+  <div class="hint" id="ovHint" style="padding:8px 4px 30px;max-width:520px;margin:0 auto">Dotknij słupka albo punktu serii, żeby podświetlić jej strzały na tarczy.</div>
 </div>
-<footer>ArcheryNote v0.3.3 · AR &amp; Claude (Anthropic)</footer>
+<footer>ArcheryNote v0.4.1 · AR &amp; Claude (Anthropic)</footer>
 </main>
 
 <script>
@@ -275,7 +284,7 @@ function renderArchers() {
   const sel = $('archerSel'); sel.innerHTML = '';
   for (const a of S.archers) { const o = document.createElement('option'); o.value = a.id; o.textContent = `${a.name} · ${a.bow}`; sel.appendChild(o); }
   sel.value = S.archerId;
-  const a = archer(); $('aName').value = a.name; $('aBow').value = a.bow; $('aOD').value = a.od; $('aN').value = a.n; $('aDist').value = a.dist;
+  const a = archer(); $('topDist').value = a.dist; $('topN').value = a.n; $('aName').value = a.name; $('aBow').value = a.bow; $('aOD').value = a.od; $('aN').value = a.n; $('aDist').value = a.dist;
   $('btnDelArcher').disabled = S.archers.length < 2;
   const others = Object.entries(S.drafts).filter(([id, d]) => id !== S.archerId && d.arrows.length);
   $('othersInfo').style.display = S.img && others.length ? 'block' : 'none';
@@ -294,11 +303,22 @@ for (const [id, key, num] of [['aName', 'name'], ['aBow', 'bow'], ['aOD', 'od', 
   $(id).addEventListener('change', e => {
     const v = num ? parseFloat(String(e.target.value).replace(',', '.')) : e.target.value.trim(); if (num ? !(v > 0) : !v) { renderArchers(); return; }
     archer()[key] = v; saveAll();
-    if (S.session) { S.session.archer = archerSnap(); if (key === 'dist' && !S.session.ends.length) S.session.dist = v; }
+    if (S.session) { S.session.archer = archerSnap(); if (key === 'dist') applySessionDist(v); }
     if (key === 'od') rescoreAll();
     renderArchers(); renderEnd(); renderSession(); draw();
   });
 }
+function applySessionDist(v) {
+  const sess = S.session; if (!sess) return;
+  const saved = sess.ends.filter(e => e.dist !== v);
+  if (saved.length && window.confirm(`Zmienić dystans na ${v} m także w ${saved.length} zapisanych seriach bieżącej sesji?`)) { for (const e of sess.ends) e.dist = v; sess.dist = v; persistSession(); }
+  else if (!sess.ends.length) sess.dist = v;
+}
+for (const [id, key] of [['topDist', 'dist'], ['topN', 'n']]) $(id).addEventListener('change', e => {
+  const v = parseFloat(String(e.target.value).replace(',', '.')); if (!(v > 0)) { renderArchers(); return; }
+  archer()[key] = v; saveAll(); if (S.session) { S.session.archer = archerSnap(); if (key === 'dist') applySessionDist(v); }
+  renderArchers(); renderEnd(); renderSession();
+});
 $('btnAddArcher').onclick = () => {
   const name = (window.prompt('Imię lub nazwa łucznika:', '') || '').trim(); if (!name) return;
   const a = archer(), n = { id: 'a' + Date.now(), name, bow: a.bow, od: a.od, n: a.n, dist: a.dist };
@@ -444,7 +464,8 @@ for (const id of ['fileCam', 'fileAny']) $(id).addEventListener('change', e => {
 
 function loadPhoto(file) {
   if ((S.arrows.length || Object.entries(S.drafts).some(([id, d]) => id !== S.archerId && !d.closed && d.arrows.length)) && !confirmSwap()) return;
-  S.photoTime = file.lastModified || Date.now();
+  S.photoTime = file.lastModified || Date.now(); S.photoFile = file; S.photoSaved = false;
+  if (S.session && !S.session.ends.length) { const el = $('topDist'); el.style.outline = '2px solid var(--acc)'; setTimeout(() => { el.style.outline = ''; }, 4000); }
   const url = URL.createObjectURL(file), im = new Image();
   im.onload = () => {
     const k = Math.min(1, WORK / Math.max(im.naturalWidth, im.naturalHeight));
@@ -453,7 +474,7 @@ function loadPhoto(file) {
     URL.revokeObjectURL(url);
     S.img = cv; S.w = cv.width; S.h = cv.height; S.rgba = cx.getImageData(0, 0, S.w, S.h).data;
     S.arrows = []; S.drafts = {}; S.manualPts = null; S.sel = null;
-    $('viewWrap').style.display = 'block'; $('cardEnd').style.display = 'block';
+    $('viewWrap').style.display = 'block'; $('cardEnd').style.display = 'block'; $('btnSavePhoto').style.display = '';
     sizeCanvas(); fitView(); busy(true);
     setTimeout(() => { reprocess(); busy(false); renderEnd(); }, 30);
   };
@@ -484,6 +505,7 @@ function reprocess() {
     setChip(v.state, v.state === 'green' ? 'siatka OK' : v.state === 'amber' ? 'sprawdź siatkę' : 'siatka nie siada');
     setMsg(`${station().name}: ${v.msg} (${Math.round(performance.now() - t0)} ms)`, v.state);
   }
+  if (S.session && !S.session.ends.length) $('regMsg').textContent += ` Nowa sesja: ${S.settings.dist} m, ${S.settings.n} strzał w serii — sprawdź u góry.`;
   rescoreCurrent(); draw();
 }
 function calibrateHere(auto) {
@@ -717,6 +739,26 @@ function renderEnd() {
   $('endSum').textContent = sum; $('endNo').textContent = S.session.ends.length + 1;
   $('endInfo').textContent = `${S.arrows.length} / ${S.settings.n} strzał`;
 }
+// ---------- save photo to gallery (user gesture required) ----------
+$('savePhoto').checked = !!store.get('savePhoto', false);
+$('savePhoto').addEventListener('change', e => store.set('savePhoto', e.target.checked));
+$('btnSavePhoto').onclick = () => savePhotoToGallery(S.session ? S.session.ends.length + (S.arrows.length ? 1 : 0) : 1, true);
+function savePhotoToGallery(nr, force) {
+  const f = S.photoFile; if (!f || (S.photoSaved && !force)) return;
+  S.photoSaved = true;
+  const d = new Date(S.photoTime || Date.now()), pad = n => String(n).padStart(2, '0');
+  const ext = (f.name && f.name.includes('.')) ? f.name.split('.').pop().toLowerCase() : 'jpg';
+  const name = `archerynote_${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}_seria${nr}.${ext}`;
+  const file = new File([f], name, { type: f.type || 'image/jpeg' });
+  const isAndroid = /Android/i.test(navigator.userAgent);
+  if (!isAndroid && navigator.canShare && navigator.canShare({ files: [file] })) {
+    navigator.share({ files: [file] }).catch(err => { S.photoSaved = false; if (err && err.name !== 'AbortError') setMsg('Telefon nie pozwolił otworzyć zapisu — użyj przycisku „Zapisz zdjęcie”.', 'amber'); });
+    return;
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
 $('btnCloseEnd').onclick = () => {
   if (!S.arrows.length) return;
   if (S.arrows.length !== S.settings.n && !window.confirm(`Seria ma ${S.arrows.length} strzał zamiast ${S.settings.n}. Zapisać mimo to?`)) return;
@@ -726,6 +768,7 @@ $('btnCloseEnd').onclick = () => {
     reg: S.reg ? (S.reg.manual ? 'manual' : S.reg.state) : 'none', dev: S.reg && S.reg.verify ? S.reg.verify.dev : null,
     arrows: S.arrows.map((a, i) => { const s = arrowScore(a); return { nr: i + 1, x: a.f ? +a.f[0].toFixed(1) : null, y: a.f ? +(-a.f[1]).toFixed(1) : null, score: s.score, label: s.label, state: a.state === 'miss' ? 'pudlo' : 'trafiona' }; })
   };
+  if ($('savePhoto').checked) savePhotoToGallery(e.nr);
   S.session.ends.push(e); if (S.session.ends.length === 1) S.session.date = new Date(e.time).toISOString(); persistSession();
   S.drafts[S.archerId] = { arrows: S.arrows, closed: true }; S.arrows = []; S.sel = null;
   const multi = S.archers.length > 1;
@@ -818,9 +861,30 @@ function renderHistory() {
 }
 
 // ---------- summary card ----------
-let cardSession = null;
+let cardSession = null, cardMode = 'card';
+const cardSvgText = () => cardMode === 'trend' ? trendSvgText() : ANStats.cardSVG(cardSession, history);
+function trendSvgText() {
+  const [face, dist] = $('trSel').value.split('|'), a = archer();
+  return ANStats.trendSVG(ANStats.trendData(history, S.archerId, face, +dist), { archer: a.name, bow: a.bow, face, dist: +dist });
+}
+function showTrend() {
+  const combos = ANStats.trendCombos(history, S.archerId), sel = $('trSel'); sel.innerHTML = '';
+  if (!combos.length) { alert(`${archer().name} nie ma jeszcze zakończonych sesji.`); return; }
+  for (const c of combos) { const o = document.createElement('option'); o.value = c.face + '|' + c.dist; o.textContent = `${((C.FACES.find(f => f.id === c.face) || {}).name || c.face).replace('WA ', '')} · ${c.dist} m (${c.count})`; sel.appendChild(o); }
+  cardMode = 'trend'; renderTrend();
+  $('btnDelSess').style.display = 'none'; $('btnSessDist').style.display = 'none'; sel.style.display = '';
+  $('overlay').style.display = 'block'; document.body.style.overflow = 'hidden'; $('overlay').scrollTop = 0;
+}
+function renderTrend() {
+  $('cardBox').innerHTML = trendSvgText();
+  const svg = $('cardBox').querySelector('svg'); svg.removeAttribute('width'); svg.removeAttribute('height'); svg.style.width = '100%'; svg.style.height = 'auto';
+  $('ovHint').textContent = 'Każdy punkt to jedna zakończona sesja; dotknij punktu, żeby zobaczyć datę i wartość. Porównywane są tylko sesje z tym samym licem i dystansem.';
+}
+$('trSel').addEventListener('change', renderTrend);
+$('btnTrend').onclick = showTrend;
 function showCard(sess) {
-  cardSession = sess;
+  cardSession = sess; cardMode = 'card'; $('trSel').style.display = 'none';
+  $('ovHint').textContent = 'Dotknij słupka albo punktu serii, żeby podświetlić jej strzały na tarczy.';
   $('cardBox').innerHTML = ANStats.cardSVG(sess, history);
   const svg = $('cardBox').querySelector('svg'); svg.removeAttribute('width'); svg.removeAttribute('height'); svg.style.width = '100%'; svg.style.height = 'auto';
   // tap a series (bar or point) to highlight its arrows on the target
@@ -830,24 +894,32 @@ function showCard(sess) {
     svg.querySelectorAll('.dot').forEach(d => d.setAttribute('opacity', !sel || d.dataset.end === sel ? 1 : 0.15));
     svg.querySelectorAll('.bar').forEach(b => b.setAttribute('opacity', !sel || b.dataset.end === sel ? 1 : 0.4));
   }));
-  $('btnDelSess').style.display = sess.status === 'zamknieta' ? '' : 'none';
+  $('btnDelSess').style.display = sess.status === 'zamknieta' ? '' : 'none'; $('btnSessDist').style.display = '';
   $('overlay').style.display = 'block'; document.body.style.overflow = 'hidden'; $('overlay').scrollTop = 0;
 }
+$('btnSessDist').onclick = () => {
+  const sess = cardSession; if (!sess) return;
+  const cur = (sess.ends[0] || {}).dist != null ? sess.ends[0].dist : sess.dist;
+  const v = parseFloat(String(window.prompt('Dystans tej sesji [m]:', cur) || '').replace(',', '.')); if (!(v > 0)) return;
+  sess.dist = v; for (const e of sess.ends) e.dist = v;
+  DB.put(sess); const i = history.findIndex(h => h.id === sess.id); if (i >= 0) history[i] = sess;
+  renderHistory(); renderSession(); showCard(sess);
+};
 $('btnCardClose').onclick = () => { $('overlay').style.display = 'none'; document.body.style.overflow = ''; };
 $('btnDelSess').onclick = async () => {
   if (!cardSession || !window.confirm('Usunąć tę sesję z historii w telefonie? Tego nie da się cofnąć (chyba że masz eksport).')) return;
   await DB.del(cardSession.id); history = history.filter(h => h.id !== cardSession.id); renderHistory(); $('btnCardClose').onclick();
 };
 $('btnCardPng').onclick = async () => {
-  const svgTxt = ANStats.cardSVG(cardSession, history), m = svgTxt.match(/viewBox="0 0 (\d+) (\d+)"/), W = +m[1], H = +m[2], k = 3;
+  const svgTxt = cardSvgText(), m = svgTxt.match(/viewBox="0 0 (\d+) (\d+)"/), W = +m[1], H = +m[2], k = 3;
   const img = new Image(), url = URL.createObjectURL(new Blob([svgTxt], { type: 'image/svg+xml' }));
   await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
   const c = document.createElement('canvas'); c.width = W * k; c.height = H * k;
   const x = c.getContext('2d'); x.scale(k, k); x.drawImage(img, 0, 0, W, H); URL.revokeObjectURL(url);
   const blob = await new Promise(r => { try { c.toBlob(r, 'image/png'); } catch (e) { r(null); } });
   if (!blob) { alert('Ta przeglądarka nie pozwala zapisać karty jako obrazka — zrób zrzut ekranu.'); return; }
-  const name = `archerynote_${cardSession.date.slice(0, 10)}.png`, file = new File([blob], name, { type: 'image/png' });
-  if (navigator.canShare && navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file], title: 'Podsumowanie treningu' }); return; } catch (e) { if (e.name === 'AbortError') return; } }
+  const name = cardMode === 'trend' ? `archerynote_postepy_${new Date().toISOString().slice(0, 10)}.png` : `archerynote_${cardSession.date.slice(0, 10)}.png`, file = new File([blob], name, { type: 'image/png' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file], title: cardMode === 'trend' ? 'Postępy' : 'Podsumowanie treningu' }); return; } catch (e) { if (e.name === 'AbortError') return; } }
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 };
 

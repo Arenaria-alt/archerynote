@@ -251,6 +251,115 @@ function cardSVG(session, history) {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" font-family="${FONT}"><rect width="${W}" height="${H}" fill="${T.bg}"/>${b}</svg>`;
 }
 
-const API = { group, summary, comparable, cardSVG, pct, offsetText };
+// ---------- trends across sessions ----------
+function trendCombos(history, archerId) {
+  const m = new Map();
+  for (const h of history || []) {
+    if (h.status !== 'zamknieta' || !h.ends || !h.ends.length || (h.archerId || null) !== (archerId || null)) continue;
+    const S = summary(h), k = S.face + '|' + S.dist;
+    const c = m.get(k) || { face: S.face, dist: S.dist, count: 0, last: 0 };
+    c.count++; c.last = Math.max(c.last, new Date(S.date).getTime()); m.set(k, c);
+  }
+  return [...m.values()].sort((a, b) => b.last - a.last);
+}
+function trendData(history, archerId, face, dist) {
+  return (history || []).filter(h => h.status === 'zamknieta' && h.ends && h.ends.length && (h.archerId || null) === (archerId || null))
+    .map(summary).filter(S => S.face === face && S.dist === dist && S.n > 0)
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
+}
+function linfit(ys, xs) { // least squares
+  const n = ys.length; xs = xs || ys.map((_, i) => i); const mx = xs.reduce((s, v) => s + v, 0) / n, my = ys.reduce((s, v) => s + v, 0) / n;
+  let sxy = 0, sxx = 0; for (let i = 0; i < n; i++) { sxy += (xs[i] - mx) * (ys[i] - my); sxx += (xs[i] - mx) ** 2; }
+  const b = sxx ? sxy / sxx : 0; return { a: my - b * mx, b };
+}
+function change(vals) { // early vs late
+  const v = vals.filter(x => x != null); if (v.length < 2) return null;
+  const k = v.length >= 6 ? 3 : 1, avg = a => a.reduce((s, x) => s + x, 0) / a.length;
+  return { from: avg(v.slice(0, k)), to: avg(v.slice(-k)), k };
+}
+function trendChart(pts, x0, y0, w, h, o) {
+  // pts: [{v, label, date}], o: {dec, zero, unit}
+  const vals = pts.map(p => p.v).filter(v => v != null); if (!vals.length) return '';
+  let lo = o.zero ? 0 : Math.min(...vals), hi = Math.max(...vals);
+  if (!o.zero) { const pad = Math.max((hi - lo) * 0.25, o.minPad || 0.5); lo = Math.max(o.floor != null ? o.floor : -Infinity, lo - pad); hi = Math.min(o.ceil != null ? o.ceil : Infinity, hi + pad); }
+  else hi = hi * 1.2 || 1;
+  const step = niceStep((hi - lo) / 3); lo = Math.floor(lo / step) * step; hi = Math.ceil(hi / step - 1e-9) * step;
+  const padL = 36, padB = 26, n = pts.length, inset = 14;
+  const ts = pts.map(p => p.t), t0 = Math.min(...ts), t1 = Math.max(...ts), span = t1 - t0;
+  const X = i => x0 + padL + inset + (span > 0 ? (pts[i].t - t0) / span : 0.5) * (w - padL - 2 * inset), Y = v => y0 + (h - padB) * (1 - (v - lo) / (hi - lo));
+  let s = '';
+  for (let t = lo; t <= hi + 1e-9; t += step) s += `<line x1="${x0 + padL}" x2="${x0 + w}" y1="${Y(t)}" y2="${Y(t)}" stroke="${T.line}"/>` + txt(x0 + padL - 6, Y(t) + 4, nf(t, step < 1 ? 1 : 0), { size: 12, fill: T.mut, anchor: 'end' });
+  const idx = pts.map((p, i) => [p, i]).filter(([p]) => p.v != null);
+  if (idx.length >= 3) { // trend line
+    const xs = idx.map(([p]) => (p.t - t0) / 864e5), f = linfit(idx.map(([p]) => p.v), xs), i0 = idx[0][1], i1 = idx[idx.length - 1][1];
+    const ya = f.a + f.b * xs[0], yb = f.a + f.b * xs[xs.length - 1];
+    s += `<path d="M${X(i0)} ${Y(ya)}L${X(i1)} ${Y(yb)}" stroke="${T.acc}" stroke-width="1.8" stroke-dasharray="6 5" fill="none"/>`;
+  }
+  if (idx.length > 1) s += `<path d="${idx.map(([p, i], k) => (k ? 'L' : 'M') + X(i) + ' ' + Y(p.v)).join('')}" fill="none" stroke="${T.s1}" stroke-width="2"/>`;
+  for (const [p, i] of idx) s += `<circle cx="${X(i)}" cy="${Y(p.v)}" r="4.5" fill="${T.s1}" stroke="${T.panel}" stroke-width="2"><title>${p.label}: ${nf(p.v, o.dec)}${o.unit || ''}</title></circle>`;
+  // direct labels: first and last only
+  const lab = [idx[0], idx[idx.length - 1]].filter((x, k, a) => k === 0 || x !== a[0]);
+  for (const [p, i] of lab) s += txt(X(i), Y(p.v) - 10, nf(p.v, o.dec), { size: 12.5, fill: T.fg2, anchor: 'middle' });
+  // x labels: first, last and a few in between
+  let lastX = -1e9; const lastI = n - 1;
+  pts.forEach((p, i) => { const x = X(i); if (i === lastI ? x - lastX >= 38 || true : x - lastX >= 44 && X(lastI) - x >= 44) { if (i === lastI && x - lastX < 38) return; s += txt(x, y0 + h - 6, p.short, { size: 11.5, fill: T.mut, anchor: 'middle' }); lastX = x; } });
+  return s;
+}
+function niceStep(raw) { const p = Math.pow(10, Math.floor(Math.log10(raw || 1))), f = raw / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p; }
+
+function trendSVG(list, meta) {
+  const W = 480, M = 16, IW = W - 2 * M; let b = '', y = 0;
+  const panel = (yy, hh) => { b += `<rect x="${M}" y="${yy}" width="${IW}" height="${hh}" rx="12" fill="${T.panel}"/>`; };
+  const d0 = list.length ? new Date(list[0].date) : null, d1 = list.length ? new Date(list[list.length - 1].date) : null;
+  const dd = d => `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
+  b += txt(M, 40, 'Postępy', { size: 24, w: 700 });
+  b += txt(M, 66, `${meta.archer || ''}${meta.bow ? ' · ' + meta.bow : ''}`, { size: 16, fill: T.fg2 });
+  b += txt(M, 88, `${FACE_NAME[meta.face] || meta.face} · ${nf(meta.dist)} m · ${list.length} ${list.length === 1 ? 'sesja' : list.length < 5 ? 'sesje' : 'sesji'}${d0 ? ` · ${dd(d0)}${dd(d1) !== dd(d0) ? '–' + dd(d1) : ''}` : ''}`, { size: 14, fill: T.mut });
+  y = 104;
+  if (list.length < 2) {
+    panel(y, 70); b += txt(M + 14, y + 30, 'Za mało danych do trendu.', { size: 16, w: 600 }) + txt(M + 14, y + 52, 'Potrzebne co najmniej 2 zamknięte sesje z tym licem i dystansem.', { size: 13, fill: T.fg2 });
+    y += 90;
+  } else {
+    const pts = list.map(S => { const d = new Date(S.date); return { S, t: d.getTime(), label: dd(d), short: `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}` }; });
+    const avg = pts.map(p => Object.assign({ v: p.S.avg }, p)), d90 = pts.map(p => Object.assign({ v: p.S.d90 != null ? p.S.d90 : null }, p));
+    const off = pts.map(p => Object.assign({ v: p.S.mx != null ? Math.hypot(p.S.mx, p.S.my) : null }, p));
+    // tiles: change early -> late
+    const cA = change(avg.map(p => p.v)), cD = change(d90.map(p => p.v)), cO = change(off.map(p => p.v));
+    const kLbl = c => c && c.k > 1 ? `śr. ${c.k} pierwszych → ${c.k} ostatnich` : 'pierwsza → ostatnia';
+    const tiles = [
+      ['Średnia/strzałę', cA ? `${nf(cA.from, 2)} → ${nf(cA.to, 2)}` : '—', cA ? `${cA.to >= cA.from ? '▲' : '▼'} ${nf(Math.abs(cA.to - cA.from), 2)} ${cA.to >= cA.from ? 'lepiej' : 'gorzej'}` : ''],
+      ['Grupa 90% [mm]', cD ? `${nf(cD.from)} → ${nf(cD.to)}` : '—', cD ? `${cD.to <= cD.from ? '▼' : '▲'} ${nf(Math.abs(cD.to - cD.from))} mm ${cD.to <= cD.from ? 'ciaśniej' : 'szerzej'}` : ''],
+      ['Środek grupy [mm]', cO ? `${nf(cO.from)} → ${nf(cO.to)}` : '—', cO ? `od środka tarczy` : '']
+    ];
+    const gap = 8, tw = (IW - 2 * gap) / 3, th = 78;
+    tiles.forEach(([k, v, sub], i) => {
+      const x = M + i * (tw + gap);
+      b += `<rect x="${x}" y="${y}" width="${tw}" height="${th}" rx="10" fill="${T.panel}"/>`;
+      b += txt(x + 10, y + 20, k, { size: 12.5, fill: T.mut }) + txt(x + 10, y + 47, v, { size: 18, w: 700 }) + txt(x + 10, y + 67, sub, { size: 11.5, fill: T.fg2 });
+    });
+    b += txt(M, y + th + 18, kLbl(cA || cD), { size: 11.5, fill: T.mut });
+    y += th + 30;
+    const chH = 150;
+    const charts = [
+      ['Średnia na strzałę', 'wyżej = lepiej', avg, { dec: 2, floor: 0, ceil: 10, minPad: 0.3 }],
+      ['Średnica grupy 90% [mm]', 'niżej = lepiej', d90, { dec: 0, zero: true, unit: ' mm' }],
+      ['Środek grupy od środka tarczy [mm]', 'celownik', off, { dec: 0, zero: true, unit: ' mm' }]
+    ];
+    for (const [title, note, data, o] of charts) {
+      panel(y, chH + 40);
+      b += txt(M + 12, y + 24, title, { size: 15, w: 650 }) + txt(W - M - 12, y + 24, note, { size: 12.5, fill: T.mut, anchor: 'end' });
+      b += trendChart(data, M + 4, y + 36, IW - 16, chH, o);
+      y += chH + 40 + 12;
+    }
+    b += `<path d="M${M + 4} ${y + 4}h22" stroke="${T.s1}" stroke-width="2"/><circle cx="${M + 15}" cy="${y + 4}" r="4.5" fill="${T.s1}" stroke="${T.bg}" stroke-width="2"/>` + txt(M + 32, y + 9, 'sesja', { size: 13, fill: T.fg2 });
+    if (list.length >= 3) b += `<path d="M${M + 90} ${y + 4}h22" stroke="${T.acc}" stroke-width="1.8" stroke-dasharray="6 5"/>` + txt(M + 118, y + 9, 'kierunek zmian (trend liniowy)', { size: 13, fill: T.fg2 });
+    y += 26;
+  }
+  b += txt(M, y + 10, 'ArcheryNote · AR & Claude (Anthropic)', { size: 11.5, fill: '#56616b' });
+  const H = y + 26;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" font-family="${FONT}"><rect width="${W}" height="${H}" fill="${T.bg}"/>${b}</svg>`;
+}
+
+const API = { group, summary, comparable, cardSVG, pct, offsetText, trendCombos, trendData, trendSVG };
 if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.ANStats = API;
 })(typeof window !== 'undefined' ? window : globalThis);

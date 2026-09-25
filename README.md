@@ -1,6 +1,22 @@
-# ArcheryNote — v0.3.3
+# ArcheryNote — v0.4.1
 
 Notatnik łuczniczy ze zdjęcia tarczy. Maszyna rejestruje geometrię, człowiek wskazuje trafienia.
+
+## Nowe w v0.4.1
+
+- **Dystans i liczba strzał w serii** widoczne na górze ekranu, pod wyborem łucznika; przy pierwszym zdjęciu nowej sesji pole dystansu podświetla się, a komunikat przypomina ustawienia.
+- Zmiana dystansu w trakcie sesji pyta, czy poprawić też zapisane serie.
+- **Poprawka dystansu zapisanej sesji:** przycisk „Dystans” na karcie podsumowania otwartej z Historii.
+
+## Nowe w v0.4 — postępy
+
+- Ekran **Postępy** (przycisk w Historii): dla wybranego łucznika i pary lico · dystans trzy wykresy w czasie — średnia na strzałę, średnica grupy 90%, odległość środka grupy od środka tarczy (celownik). Oś czasu proporcjonalna do dat, przerywana linia trendu (regresja liniowa od 3 sesji), kafelki „średnia 3 pierwszych → 3 ostatnich” (od 6 sesji; wcześniej pierwsza → ostatnia). Udostępnianie jako PNG.
+
+## Nowe w v0.3.4
+
+- Nazewnictwo: „promień strzały” (brzechwa) zamiast „trzonka”; kolumna odległości trafienia opisana jako „od środka [mm]”.
+- Opcja **zapisuj zdjęcie serii w galerii**: przy „Zamknij serię” iPhone otwiera arkusz udostępniania („Zachowaj obraz”), Android pobiera plik do Pobranych. Przycisk „Zapisz zdjęcie” na żądanie.
+- Przycisk **Nowa tarcza** / **Usuń tarczę** w ustawieniach (v0.3.3).
 
 ## Nowe w v0.3.1
 
@@ -69,7 +85,6 @@ tests/regression.js   test na folderze zdjęć (Node + jpeg-js)
 - podgląd z kamery na żywo z zieloną/czerwoną siatką (rdzeń jest gotowy — 0,8 s na klatkę 2000 px trzeba zejść do ~960 px),
 - czas z EXIF (teraz: `lastModified` pliku),
 - tryb poprawek po treningu i status sesji roboczej,
-- wykres trendów między sesjami (jest tabela porównawcza),
 - 3-spot.
 
 AR & Claude (Anthropic)
